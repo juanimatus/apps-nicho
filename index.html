@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es" data-app="ventas">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apps a medida para tu negocio</title>
+    <meta
+      name="description"
+      content="Mini apps conectadas a WhatsApp para barberías, inmobiliarias, gimnasios, consultorios, restaurantes, tiendas online, talleres y estudios contables."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="wrap">
+        <a class="brand" href="./"><span class="logo">⚡</span><span data-marca></span></a>
+        <nav>
+          <a class="btn sm ghost" href="#apps">Apps</a>
+          <a class="btn sm wa" data-wa-ventas>WhatsApp</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="l-hero">
+        <div class="wrap">
+          <span class="eyebrow">Apps a medida · listas en días, no en meses</span>
+          <h1>Tu negocio atiende, cobra y recuerda solo.</h1>
+          <p class="lead">
+            Mini apps conectadas a WhatsApp, pensadas para un rubro concreto. Las adaptamos a tu marca y las dejamos
+            funcionando con automatizaciones en Make.
+          </p>
+          <div class="row">
+            <a class="btn primary" href="#apps">Ver apps por rubro</a>
+            <a class="btn wa" data-wa-ventas>Hablemos por WhatsApp</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="l-section alt" id="apps">
+        <div class="wrap">
+          <h2>Elige tu rubro</h2>
+          <p class="muted">Cada demo funciona de verdad: ábrela en el celular y pruébala.</p>
+          <div class="grid c3 mt" id="catalogo"></div>
+        </div>
+      </section>
+
+      <section class="l-section">
+        <div class="wrap">
+          <h2>Cómo trabajamos</h2>
+          <div class="grid c3 mt">
+            <div class="feature">
+              <span class="num">1</span>
+              <h3>Demo de 15 minutos</h3>
+              <p class="muted">Te muestro la app de tu rubro funcionando y vemos qué necesita tu negocio.</p>
+            </div>
+            <div class="feature">
+              <span class="num">2</span>
+              <h3>La adaptamos a ti</h3>
+              <p class="muted">Tu marca, tus servicios, tus precios y tus mensajes. Lista en pocos días.</p>
+            </div>
+            <div class="feature">
+              <span class="num">3</span>
+              <h3>Funciona sola</h3>
+              <p class="muted">Las automatizaciones corren en Make. Tú miras el panel. Soporte incluido.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="l-section final">
+        <div class="wrap center">
+          <h2>¿No ves tu rubro?</h2>
+          <p class="lead">Si tu negocio repite tareas todos los días, se puede automatizar. Cuéntame qué haces.</p>
+          <a class="btn wa" data-wa-ventas>Escribir por WhatsApp</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="wrap small muted">© <span data-anio></span> <span data-marca></span></div>
+    </footer>
+
+    <script src="config.js"></script>
+    <script src="shared/core.js"></script>
+    <script src="shared/catalogo.js"></script>
+    <script>
+      document.getElementById("catalogo").innerHTML = window.CATALOGO.map(
+        (a) => `<a class="card app-card" style="--c:${a.color}" href="apps/${a.id}/">
+          <span class="ic">${a.icono}</span>
+          <span class="badge" style="align-self:flex-start">${Core.esc(a.nicho)}</span>
+          <h3>${Core.esc(a.titulo)}</h3>
+          <p class="muted">${Core.esc(a.dolor)}</p>
+          <span class="link" style="color:${a.color}">Ver app y demo →</span>
+        </a>`,
+      ).join("");
+    </script>
+  </body>
+</html>
