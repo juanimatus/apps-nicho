@@ -213,7 +213,29 @@ section{display:flex;flex-direction:column;gap:14px}
   .lab-w{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px}
 }
 
+/* ---------- Conexión (figuras de anatomy-figures) ---------- */
+.conn{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.cfig{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.cfig-head{padding:16px 18px 12px;display:flex;flex-direction:column;gap:8px}
+.cfig-head h3{font-size:1rem;font-weight:800;display:flex;gap:10px;align-items:baseline}
+.cfig-head .num{font-family:var(--display);font-weight:800;color:var(--muted)}
+.lyrs{display:flex;flex-wrap:wrap;gap:6px}
+.lyr{font-family:var(--display);font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--c);color:var(--on)}
+.lyr.soft{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.fig-slot{aspect-ratio:var(--r);border-block:1px solid var(--line);display:grid}
+.fig-slot>*{grid-area:1/1;width:100%}
+.fig-msg{place-self:center;color:var(--muted);font-size:.85rem;padding:16px;text-align:center}
+.guide{padding:14px 18px 18px;display:flex;flex-direction:column;gap:12px;font-size:.9rem}
+.guide ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px}
+.guide h4{font-family:var(--display);font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0}
+.gloss{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;margin:0;font-size:.82rem}
+.gloss dt{font-family:var(--display);font-size:.72rem;white-space:nowrap}
+.gloss dd{margin:0;color:var(--muted)}
+.see{font-weight:600;color:var(--accent);text-decoration:none}
+.see:hover{text-decoration:underline}
+
 @media (max-width:900px){
+  .conn{grid-template-columns:minmax(0,1fr)}
   .main{grid-template-columns:minmax(0,1fr)}
   .detail{position:static}
 }
@@ -246,6 +268,67 @@ section{display:flex;flex-direction:column;gap:14px}
     </div>
     <article class="detail" id="detail" aria-live="polite"></article>
   </div>
+
+  <section aria-labelledby="con-h">
+    <div class="sec-head">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span class="eyebrow">Antes del primer byte</span>
+        <h2 id="con-h">Conectarse: DNS y TCP</h2>
+        <p>Antes de que el webhook de Make baje por la pila pasan dos cosas: la máquina averigua la IP del servidor (DNS) y abre una conexión con él (TCP). Si falla alguna, tu pedido HTTP ni sale. Las figuras están en inglés: abajo de cada una tenés qué tocar y cómo leerla.</p>
+      </div>
+    </div>
+    <div class="conn">
+      <article class="cfig">
+        <div class="cfig-head">
+          <h3><span class="num">1</span>Averiguar la IP (DNS)</h3>
+          <div class="lyrs"><span class="lyr" data-l="7">L7 Aplicación</span><span class="lyr" data-l="4">viaja por UDP · L4</span><span class="lyr soft">puerto 53</span></div>
+        </div>
+        <div class="fig-slot" style="--r:600/440" data-fig="dns"><p class="fig-msg">Cargando figura…</p></div>
+        <div class="guide">
+          <p>Make sabe que tiene que pegarle a <code>graph.facebook.com</code>, pero los paquetes viajan con direcciones IP. El resolver va preguntando de arriba hacia abajo: a la raíz, al servidor de <code>.com</code> y al del dominio.</p>
+          <h4>Tocá la figura cuatro veces</h4>
+          <ol>
+            <li><b>Primera consulta:</b> nadie sabe nada, así que pregunta a root, com y example.com. Son 3 consultas.</li>
+            <li><b>Otro nombre del mismo dominio</b> (<code>mail.</code>): ya sabe quién manda en example.com y va directo. 1 consulta.</li>
+            <li><b>El primer nombre otra vez:</b> sale del caché en unos pocos milisegundos, sin preguntar a nadie.</li>
+            <li><b>Una hora después:</b> se venció el TTL de las respuestas y vuelve a preguntar.</li>
+          </ol>
+          <dl class="gloss">
+            <dt>asking</dt><dd>le está preguntando a</dd>
+            <dt>in cache</dt><dd>la respuesta ya estaba guardada</dd>
+            <dt>expired</dt><dd>se venció el TTL (tiempo de vida)</dd>
+            <dt>queries</dt><dd>consultas</dd>
+          </dl>
+          <p class="note"><b>En Make:</b> un error <code>getaddrinfo ENOTFOUND</code> quiere decir que falló este paso. El dominio está mal escrito o no existe.</p>
+        </div>
+      </article>
+      <article class="cfig">
+        <div class="cfig-head">
+          <h3><span class="num">2</span>Abrir la conexión (TCP)</h3>
+          <div class="lyrs"><span class="lyr" data-l="4">L4 Transporte</span><span class="lyr soft">puerto 443 · HTTPS</span></div>
+        </div>
+        <div class="fig-slot" style="--r:600/380" data-fig="tcp-handshake"><p class="fig-msg">Cargando figura…</p></div>
+        <div class="guide">
+          <p>Con la IP en la mano, el cliente arma la conexión en tres pasos. Recién cuando los dos lados quedan en <code>ESTABLISHED</code> viaja el pedido HTTP.</p>
+          <h4>Tocá una de las máquinas para conectar</h4>
+          <ol>
+            <li><b>SYN:</b> el cliente propone conectarse y elige su número de secuencia.</li>
+            <li><b>SYN-ACK:</b> el servidor acepta, confirma ese número (+1) y manda el suyo.</li>
+            <li><b>ACK:</b> el cliente confirma el número del servidor. Conexión abierta.</li>
+          </ol>
+          <p>Ahora tocá la <b>casilla del medio</b> (un router en el camino) y conectá de nuevo: el SYN se pierde, el cliente espera a que venza su temporizador y lo reenvía. Eso es una retransmisión.</p>
+          <dl class="gloss">
+            <dt>LISTEN</dt><dd>el servidor espera conexiones</dd>
+            <dt>SYN-SENT</dt><dd>el cliente mandó SYN y espera respuesta</dd>
+            <dt>SYN-RECEIVED</dt><dd>el servidor respondió y espera el ACK</dd>
+            <dt>ESTABLISHED</dt><dd>conexión abierta</dd>
+            <dt>seq · ack</dt><dd>número de secuencia · número que se confirma</dd>
+          </dl>
+          <p class="note"><b>En Make:</b> <code>ETIMEDOUT</code> es que el SYN nunca tuvo respuesta (firewall o servidor caído). <code>ECONNREFUSED</code> es que el servidor respondió que no hay nadie escuchando en ese puerto.</p>
+        </div>
+      </article>
+    </div>
+  </section>
 
   <section aria-labelledby="sim-h">
     <div class="sec-head">
@@ -508,6 +591,8 @@ function select(k, focus) {
       </div>
       <div class="row"><h3>Cuando falla</h3><p>${x.breaks}</p></div>
       <p class="note"><b>En la práctica:</b> ${x.work}</p>
+      ${k === 7 ? `<a class="see" href="#con-h">Ver la resolución DNS animada ↓</a>` : ""}
+      ${k === 4 ? `<a class="see" href="#con-h">Ver el handshake TCP animado ↓</a>` : ""}
     </div>`;
   if (window.onSel) window.onSel(k);
 }
@@ -851,6 +936,36 @@ labMain.addEventListener("click", e => {
 });
 window.onSel = showLab;
 showLab(sel);
+document.querySelectorAll(".lyr[data-l]").forEach(el => paint(el, +el.dataset.l));
+</script>
+
+<script type="module">
+// Figuras de anatomy-figures (versión sin React, ya trae React adentro).
+// Se cargan del CDN recién cuando la sección está por entrar en pantalla.
+const CDN = "https://cdn.jsdelivr.net/npm/anatomy-figures@0.1.0/dist/element/";
+const dark = matchMedia("(prefers-color-scheme: dark)");
+const theme = () => {
+  const t = document.documentElement.dataset.theme;
+  return t === "light" || t === "dark" ? t : (dark.matches ? "dark" : "light");
+};
+const figs = [];
+async function load(slot) {
+  try {
+    const m = await import(CDN + slot.dataset.fig + ".js");
+    m.define();
+    const el = document.createElement(m.tag);
+    el.setAttribute("theme", theme());
+    slot.replaceChildren(el);
+    figs.push(el);
+  } catch {
+    slot.querySelector(".fig-msg").textContent = "No se pudo cargar la figura: necesita conexión a internet.";
+  }
+}
+const io = new IntersectionObserver(entries => entries.forEach(e => {
+  if (e.isIntersecting) { io.unobserve(e.target); load(e.target); }
+}), { rootMargin: "600px 0px" });
+document.querySelectorAll(".fig-slot[data-fig]").forEach(s => io.observe(s));
+dark.addEventListener("change", () => figs.forEach(f => f.setAttribute("theme", theme())));
 </script>
 
 </body>
