@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Pulsos en la fibra</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap">
+<style>
+/* Layout: banco óptico oscuro. Arriba la fibra animada (emisor → vidrio → fotodiodo), debajo osciloscopio + presupuesto del enlace, después la decodificación byte a byte y la reflexión total interna. Tema único oscuro, a propósito: la luz se lee mejor sobre negro. */
+:root{
+  --bg:#06090e; --panel:#0d141d; --panel2:#111b27; --line:#1f2c3b; --fg:#e7edf4; --muted:#8b9cb1;
+  --beam:#ff4d3d; --beam-sm:#d46bff; --amber:#ffb547; --ok:#4fdc8b; --bad:#ff6b6b;
+  --glass:#16324a; --clad:#0f2233; --jacket:#1a2533;
+  --display:"Bai Jamjuree", "Figtree", system-ui, sans-serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:26px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(1.7rem,4.5vw,2.6rem);font-weight:700;line-height:1.1}
+h2{font-size:1.2rem;font-weight:700}
+h3{font-size:.95rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:8px;max-width:72ch}
+header p{color:var(--muted)}
+.beam-t{color:var(--beam)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;justify-content:space-between}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+
+/* Controles */
+.controls{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.ctl{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ctl label,.ctl .lab{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ctl output{font-family:var(--mono);font-size:.82rem;color:var(--fg)}
+.ctl .row{display:flex;gap:8px;align-items:center}
+input[type=text]{font:600 1rem var(--mono);padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:9.5em}
+input[type=range]{accent-color:var(--beam);width:150px}
+input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.btn{all:unset;cursor:pointer;padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);font-weight:600;font-size:.88rem;white-space:nowrap}
+.btn.primary{background:var(--beam);border-color:var(--beam);color:#12060a}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,.seg button:focus-visible,tr[tabindex]:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:7px 12px;font-size:.85rem;background:var(--panel2)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);font-weight:600}
+
+/* Escenario */
+.stage{position:relative;background:radial-gradient(90% 120% at 50% 50%,#0c1724,var(--bg));border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#fiber{display:block;width:100%;height:230px}
+.stage-foot{display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+.pill{font-family:var(--mono);font-size:.72rem;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:999px;border:1px solid currentColor}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--amber)} .pill.bad{color:var(--bad)}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+.scope-wrap{overflow-x:auto;border-radius:6px;background:#05080c;border:1px solid var(--line)}
+#scope{display:block;height:230px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.78rem;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:6px;border-radius:2px}
+
+dl.stats{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;margin:0;font-size:.86rem}
+dl.stats dt{color:var(--muted)}
+dl.stats dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.xsec{display:flex;gap:12px;align-items:center;border-top:1px solid var(--line);padding-top:12px}
+.xsec svg{width:96px;height:96px;flex:none}
+.xsec p{font-size:.8rem;color:var(--muted)}
+
+/* Decodificación */
+.decode{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.rxtext{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:52px}
+.rxtext .c{font-family:var(--mono);font-weight:800;font-size:1.5rem;min-width:1.6em;text-align:center;padding:4px 6px;border-radius:5px;background:var(--panel2);border:1px solid var(--line)}
+.rxtext .c.err{border-color:var(--bad);color:var(--bad)}
+.rxtext .c.wait{color:var(--muted);opacity:.5}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;font-size:.85rem;width:100%}
+th,td{text-align:left;padding:7px 12px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.m{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--panel2)}
+tbody tr.sel td{background:color-mix(in oklab,var(--amber) 12%,transparent)}
+.bits{font-family:var(--mono);letter-spacing:.04em}
+.bits b{font-weight:800;color:var(--fg)} .bits s{color:var(--muted);text-decoration:none}
+.bits .x{color:var(--bad);text-decoration:underline;text-underline-offset:3px;font-weight:800}
+.bits .nib{margin-right:.45em}
+.okc{color:var(--ok)} .badc{color:var(--bad)}
+.weights{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;text-align:center}
+.w{border:1px solid var(--line);border-radius:6px;padding:6px 2px;display:flex;flex-direction:column;gap:2px;background:var(--panel2)}
+.w small{font-family:var(--mono);font-size:.62rem;color:var(--muted)}
+.w b{font-family:var(--mono);font-size:1.15rem}
+.w span{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.w.on{border-color:var(--amber);background:color-mix(in oklab,var(--amber) 14%,var(--panel2))}
+.w.on span{color:var(--fg)}
+.w.err{outline:2px solid var(--bad)}
+.sum{font-family:var(--mono);font-size:.9rem;line-height:1.7}
+.sum .big{font-size:1.4rem;font-weight:800}
+.note{background:var(--panel2);border-radius:6px;padding:10px 12px;font-size:.86rem;color:var(--muted)}
+.note b{color:var(--fg)}
+
+/* Reflexión total */
+.tir{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:center}
+.tir svg{width:100%;height:auto;display:block;background:#05080c;border-radius:6px;border:1px solid var(--line)}
+.tlab{font:600 12px var(--body);fill:var(--muted)}
+.tval{font:800 13px var(--mono);fill:var(--fg)}
+
+@media (max-width:900px){.grid2,.decode,.tir{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){
+  .weights{grid-template-columns:repeat(4,minmax(0,1fr))}
+  input[type=range]{width:130px}
+  #fiber{height:200px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Capa 1 · Medio óptico</span>
+    <h1>Pulsos en la fibra</h1>
+    <p>Escribí un mensaje y mandalo por la fibra. Cada bit 1 enciende el emisor y cada 0 lo apaga. La luz rebota dentro del núcleo hasta el fotodiodo, que la convierte en corriente. El receptor compara esa señal con un umbral y reconstruye los bits, los bytes y el texto. Cambiá la distancia y el tipo de fibra para ver cuándo empieza a fallar.</p>
+  </header>
+
+  <div class="controls">
+    <div class="ctl"><label for="msg">Mensaje</label><div class="row"><input type="text" id="msg" value="Hola" maxlength="6" autocomplete="off" spellcheck="false"><button type="button" class="btn primary" id="send">Enviar</button></div></div>
+    <div class="ctl"><span class="lab">Reproducción</span><div class="row"><button type="button" class="btn" id="pause">Pausar</button><button type="button" class="btn" id="skip">Ver resultado</button></div></div>
+    <div class="ctl"><span class="lab">Fibra</span><div class="seg" role="group" aria-label="Tipo de fibra"><button type="button" id="t-mm" aria-pressed="true">Multimodo 850 nm</button><button type="button" id="t-sm" aria-pressed="false">Monomodo 1550 nm</button></div></div>
+    <div class="ctl"><label for="dist">Distancia · <output id="dist-o"></output></label><input type="range" id="dist"></div>
+    <div class="ctl"><label for="thr">Umbral · <output id="thr-o"></output></label><input type="range" id="thr" min="10" max="90" value="50"></div>
+    <div class="ctl"><label for="speed">Velocidad · <output id="speed-o"></output></label><input type="range" id="speed" min="2" max="40" value="12"></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="fiber" aria-label="Animación de pulsos de luz viajando por la fibra óptica"></canvas>
+    <div class="stage-foot"><span id="foot-l"></span><span id="status-pill" class="pill ok">ENLACE OK</span></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-head"><h2>Osciloscopio del receptor</h2><span class="muted small" id="scope-cap"></span></div>
+      <div class="scope-wrap" id="scope-wrap"><canvas id="scope" aria-label="Señal recibida por el fotodiodo, umbral y bits decididos"></canvas></div>
+      <div class="legend"><span><i style="background:var(--beam)"></i>señal recibida (normalizada)</span><span><i style="background:var(--muted)"></i>lo que se envió</span><span><i style="background:var(--amber)"></i>umbral</span><span><i style="background:var(--ok)"></i>muestra correcta</span><span><i style="background:var(--bad)"></i>bit erróneo</span></div>
+      <p class="note">El receptor toma <b>una muestra en el centro de cada bit</b>. Si la señal está por encima del umbral decide 1, si está por debajo decide 0. Con la distancia, la luz llega más débil (el ruido pesa más) y más desparramada (cada pulso invade al vecino). Las dos cosas hacen que una muestra caiga del lado equivocado.</p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Presupuesto del enlace</h2></div>
+      <dl class="stats" id="stats"></dl>
+      <div class="xsec">
+        <svg viewBox="0 0 100 100" aria-label="Corte transversal de la fibra a escala"><circle cx="50" cy="50" r="48" fill="var(--jacket)" stroke="var(--line)"/><circle cx="50" cy="50" r="24" fill="var(--clad)" stroke="#2b4a66"/><circle id="xs-core" cx="50" cy="50" r="12" fill="var(--beam)"/></svg>
+        <p id="xs-txt"></p>
+      </div>
+    </div>
+  </div>
+
+  <section class="card" aria-labelledby="dec-h">
+    <div class="card-head"><div style="display:flex;flex-direction:column;gap:4px"><span class="eyebrow">Decodificación</span><h2 id="dec-h">De la luz al texto</h2></div><span class="muted small" id="dec-cap"></span></div>
+    <div class="rxtext" id="rxtext" aria-live="polite"></div>
+    <div class="decode">
+      <div class="tbl"><table><thead><tr><th>Byte</th><th>Bits recibidos</th><th>Hex</th><th>Dec</th><th>Enviado</th><th>Recibido</th></tr></thead><tbody id="bytes"></tbody></table></div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0" id="wpanel"></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="tir-h">
+    <div class="card-head"><div style="display:flex;flex-direction:column;gap:4px"><span class="eyebrow">Por qué la luz no se escapa</span><h2 id="tir-h">Reflexión total interna</h2></div></div>
+    <div class="tir">
+      <svg id="tir-svg" viewBox="0 0 360 210" role="img" aria-label="Rayo de luz llegando al borde entre núcleo y revestimiento"></svg>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <div class="ctl"><label for="ang">Ángulo de incidencia · <output id="ang-o"></output></label><input type="range" id="ang" min="0" max="89.5" step="0.5" value="83" style="width:100%"></div>
+        <p id="tir-txt"></p>
+        <p class="note">Ley de Snell: <b>n₁ · sen θ₁ = n₂ · sen θ₂</b>. El núcleo tiene un índice de refracción un poco mayor que el revestimiento. Más allá del ángulo crítico θc = arcsen(n₂/n₁) no existe ángulo de salida y toda la luz rebota hacia adentro. Por eso la fibra guía la luz aunque esté curvada, siempre que no se doble demasiado.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------- Física ---------- */
+const C = 299792.458; // km/s
+const F = {
+  mm:{name:"Multimodo de índice escalonado", short:"Multimodo", lambda:850, core:62.5, clad:125, n1:1.48, n2:1.46, alpha:3.0, rate:10, ptx:-3, sens:-24,
+      dmin:.1, dmax:3, dstep:.1, d0:.6, src:"Emisor LED/VCSEL 850 nm", beam:"#ff4d3d"},
+  sm:{name:"Monomodo estándar (G.652)", short:"Monomodo", lambda:1550, core:9, clad:125, n1:1.4682, n2:1.4629, alpha:.2, rate:1000, ptx:0, sens:-28, D:17, dl:.1,
+      dmin:5, dmax:200, dstep:5, d0:60, src:"Láser DFB 1550 nm", beam:"#d46bff"}
+};
+const S = {type:"mm", dist:.6, thr:.5, speed:1.2, msg:"Hola", running:true, t:9, seed:7, sel:0};
+const FLIGHT = 6, R = 16;
+function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+.3275911*x);return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x));}
+const Phi = x => .5 * (1 + erf(x / Math.SQRT2));
+const tail = q => q <= 0 ? .5 : q < 5 ? .5 * (1 - erf(q / Math.SQRT2)) : Math.exp(-q * q / 2) / (q * Math.sqrt(2 * Math.PI));
+const mW = dbm => 10 ** (dbm / 10);
+const nf = (v, d = 1) => v.toLocaleString("es-AR", {minimumFractionDigits:d, maximumFractionDigits:d});
+const sci = v => { if (v < 1e-15) return "< 10⁻¹⁵"; if (v >= .01) return nf(v, 2); const e = Math.floor(Math.log10(v)), m = v / 10 ** e; const sup = String(e).replace("-", "⁻").replace(/\d/g, d => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]); return `${nf(m, 1)} × 10${sup}`; };
+let K = {};
+function derive() {
+  const f = F[S.type], L = S.dist, v = C / f.n1;
+  const thc = Math.asin(f.n2 / f.n1), NA = Math.sqrt(f.n1 ** 2 - f.n2 ** 2);
+  const loss = f.alpha * L + 1, prx = f.ptx - loss;
+  const dispNs = S.type === "mm" ? L * (f.n1 / C) * (f.n1 / f.n2 - 1) * 1e9 : f.D * f.dl * L / 1000;
+  const Tb = 1000 / f.rate, D = dispNs / Tb;
+  const s = Math.sqrt(.06 ** 2 + (D / 2) ** 2);
+  const sig = Math.max(.012, (mW(f.sens) / mW(prx)) / 12);
+  const Pc = Phi(.5 / s) - Phi(-.5 / s);
+  const margin = Math.min(Pc - S.thr, S.thr - (1 - Pc));
+  const Q = Math.max(0, margin) / sig, ber = margin <= 0 ? .5 : tail(Q);
+  K = {f, L, v, thc, NA, acc:Math.asin(NA), loss, prx, dispNs, Tb, D, s, sig, Pc, ber, tof:L / v * 1e6};
+}
+
+/* ---------- Señal ---------- */
+let bytesTx = [], bits = [], N = 0, noise = [], samples = [], rxBits = [];
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const P = x => Phi(x / K.s) - Phi((x - 1) / K.s);
+function yAt(tau) {
+  let y = 0; const c = tau - K.D / 2, lo = Math.max(0, Math.floor(c - 4 - 3 * K.s)), hi = Math.min(N - 1, Math.ceil(c + 4 + 3 * K.s));
+  for (let i = lo; i <= hi; i++) if (bits[i]) y += P(c - i);
+  return y;
+}
+function prepare() {
+  bytesTx = Array.from(new TextEncoder().encode(S.msg || " "));
+  bits = []; bytesTx.forEach(b => { for (let k = 7; k >= 0; k--) bits.push((b >> k) & 1); });
+  N = bits.length;
+  const r = rng(S.seed), len = Math.ceil((N + K.D + 6) * R);
+  noise = new Float64Array(len);
+  for (let i = 0; i < len; i += 2) { const u = Math.max(1e-12, r()), w = r(), m = Math.sqrt(-2 * Math.log(u)); noise[i] = m * Math.cos(2 * Math.PI * w); if (i + 1 < len) noise[i + 1] = m * Math.sin(2 * Math.PI * w); }
+  samples = bits.map((_, i) => { const ts = i + .5 + K.D / 2; return {ts, v: yAt(ts) + K.sig * noise[Math.round(ts * R)]}; });
+  rxBits = samples.map(s => s.v > S.thr ? 1 : 0);
+}
+const endT = () => FLIGHT + N + K.D + 1.5;
+
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+const distEl = $("dist");
+function setType(t, keepDist) {
+  S.type = t; const f = F[t];
+  $("t-mm").setAttribute("aria-pressed", String(t === "mm")); $("t-sm").setAttribute("aria-pressed", String(t === "sm"));
+  distEl.min = f.dmin; distEl.max = f.dmax; distEl.step = f.dstep;
+  if (!keepDist) S.dist = f.d0;
+  distEl.value = S.dist;
+  document.documentElement.style.setProperty("--beam", f.beam);
+  refresh();
+}
+function refresh() {
+  derive(); prepare();
+  $("dist-o").textContent = S.dist >= 10 ? `${nf(S.dist, 0)} km` : `${nf(S.dist, 1)} km`;
+  $("thr-o").textContent = `${Math.round(S.thr * 100)} %`;
+  $("speed-o").textContent = `${nf(S.speed, 1)} bits/s`;
+  renderStats(); lastDone = -1;
+  if (!S.running) draw();
+}
+function renderStats() {
+  const f = K.f, margin = K.prx - f.sens;
+  const st = [
+    ["Fibra", f.name], ["Longitud de onda", `${f.lambda} nm`], ["Núcleo / revestimiento", `${nf(f.core, f.core % 1 ? 1 : 0)} / ${f.clad} µm`],
+    ["n₁ núcleo / n₂ revestimiento", `${nf(f.n1, 4)} / ${nf(f.n2, 4)}`], ["Ángulo crítico", `${nf(K.thc * 180 / Math.PI)}°`],
+    ["Apertura numérica", `${nf(K.NA, 3)} (acepta ±${nf(K.acc * 180 / Math.PI)}°)`], ["Velocidad en el vidrio", `${Math.round(K.v).toLocaleString("es-AR")} km/s`],
+    ["Tiempo de vuelo", K.tof >= 1000 ? `${nf(K.tof / 1000, 2)} ms` : `${nf(K.tof, 2)} µs`], ["Tasa de bits", f.rate >= 1000 ? `${f.rate / 1000} Gb/s` : `${f.rate} Mb/s`],
+    ["Potencia emitida", `${nf(f.ptx)} dBm`], ["Pérdida", `${nf(K.loss)} dB (${nf(f.alpha, f.alpha < 1 ? 2 : 1)} dB/km + 1 dB conectores)`],
+    ["Potencia recibida", `${nf(K.prx)} dBm`], ["Sensibilidad del receptor", `${nf(f.sens)} dBm · margen ${margin >= 0 ? "+" : ""}${nf(margin)} dB`],
+    ["Dispersión", `${K.dispNs < 1 ? nf(K.dispNs * 1000, 0) + " ps" : nf(K.dispNs, 0) + " ns"} = ${nf(K.D, 2)} bits`],
+    ["Apertura del ojo", `${Math.max(0, Math.round((2 * K.Pc - 1) * 100))} %`], ["BER estimada", sci(K.ber)]
+  ];
+  $("stats").innerHTML = st.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join("");
+  $("xs-core").setAttribute("r", (24 * f.core / f.clad).toFixed(2));
+  $("xs-txt").innerHTML = `Corte a escala: núcleo de <b>${nf(f.core, f.core % 1 ? 1 : 0)} µm</b> dentro de un revestimiento de 125 µm, con una cubierta de 250 µm. Un pelo humano mide unos 70 µm.`;
+  const pill = $("status-pill"), bad = K.ber > 1e-3, warn = K.ber > 1e-9;
+  pill.className = "pill " + (bad ? "bad" : warn ? "warn" : "ok");
+  pill.textContent = bad ? "EL ENLACE FALLA" : warn ? "AL LÍMITE" : "ENLACE OK";
+  $("foot-l").textContent = `${f.src} → fotodiodo · vista comprimida: la fibra real de ${S.dist >= 10 ? nf(S.dist, 0) : nf(S.dist, 1)} km lleva ${Math.round(K.tof * f.rate).toLocaleString("es-AR")} bits viajando a la vez. En la vida real ${f.lambda} nm es infrarrojo e invisible: acá lo pintamos.`;
+  const lim = S.type === "mm" ? "En multimodo manda la dispersión modal: los rayos más inclinados recorren más camino y llegan tarde." : "En monomodo manda la atenuación: hay un solo camino y la dispersión es mínima, pero a 0,2 dB/km la potencia termina bajo la sensibilidad.";
+  $("scope-cap").textContent = lim;
+}
+
+$("msg").addEventListener("input", e => { S.msg = e.target.value; S.t = 0; S.sel = 0; S.running = true; syncPause(); refresh(); });
+$("send").onclick = () => { S.seed = (S.seed * 48271) % 2147483647; S.t = 0; S.sel = 0; S.running = true; syncPause(); refresh(); };
+$("pause").onclick = () => { if (S.t >= endT()) { S.t = 0; S.sel = 0; } S.running = !S.running; syncPause(); };
+$("skip").onclick = () => { S.t = endT(); S.running = false; syncPause(); draw(); };
+$("t-mm").onclick = () => setType("mm");
+$("t-sm").onclick = () => setType("sm");
+distEl.addEventListener("input", () => { S.dist = +distEl.value; refresh(); });
+$("thr").addEventListener("input", e => { S.thr = e.target.value / 100; refresh(); });
+$("speed").addEventListener("input", e => { S.speed = e.target.value / 10; $("speed-o").textContent = `${nf(S.speed, 1)} bits/s`; });
+function syncPause() { $("pause").textContent = S.running ? "Pausar" : S.t >= endT() ? "Repetir" : "Seguir"; }
+
+/* ---------- Canvas: fibra ---------- */
+const fc = $("fiber"), fx = fc.getContext("2d");
+function fit(cv, w, h) { const d = window.devicePixelRatio || 1; cv.width = Math.round(w * d); cv.height = Math.round(h * d); cv.style.width = w + "px"; cv.style.height = h + "px"; const c = cv.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0); return c; }
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; }
+function drawFiber() {
+  const W = fc.clientWidth, H = fc.clientHeight; fit(fc, W, H);
+  const f = K.f, beam = f.beam, tw = W < 560 ? 54 : 92, x0 = tw + 14, x1 = W - tw - 14, Lp = x1 - x0, cy = H / 2 + 6;
+  const clH = Math.min(120, H * .52), coreH = Math.max(3, clH * f.core / f.clad);
+  fx.clearRect(0, 0, W, H);
+  // cubierta, revestimiento, núcleo
+  fx.fillStyle = css("--jacket"); fx.fillRect(x0 - 4, cy - clH / 2 - 10, Lp + 8, clH + 20);
+  fx.fillStyle = css("--clad"); fx.fillRect(x0, cy - clH / 2, Lp, clH);
+  const g = fx.createLinearGradient(0, cy - coreH / 2, 0, cy + coreH / 2);
+  g.addColorStop(0, css("--glass")); g.addColorStop(.5, "#1d4566"); g.addColorStop(1, css("--glass"));
+  fx.fillStyle = g; fx.fillRect(x0, cy - coreH / 2, Lp, coreH);
+  fx.strokeStyle = "#2f5878"; fx.lineWidth = 1; fx.beginPath(); fx.moveTo(x0, cy - coreH / 2); fx.lineTo(x1, cy - coreH / 2); fx.moveTo(x0, cy + coreH / 2); fx.lineTo(x1, cy + coreH / 2); fx.stroke();
+  fx.font = "600 11px Figtree, sans-serif"; fx.fillStyle = css("--muted");
+  fx.fillText(`revestimiento · n₂ = ${nf(f.n2, f.n2 * 100 % 1 ? 4 : 2)}`, x0 + 8, cy - clH / 2 + 15);
+  fx.fillText(`núcleo ${nf(f.core, f.core % 1 ? 1 : 0)} µm · n₁ = ${nf(f.n1, f.n1 * 100 % 1 ? 4 : 2)}`, x0 + 8, S.type === "mm" ? cy + coreH / 2 - 6 : cy + coreH / 2 + 15);
+  fx.fillText("cubierta", x0 + 8, cy + clH / 2 + 7);
+  // rayos
+  const t = S.t, maxAng = Math.PI / 2 - K.thc, modes = [0, .55, 1];
+  fx.save(); fx.globalCompositeOperation = "lighter"; fx.lineCap = "round";
+  modes.forEach((m, mi) => {
+    const Tm = FLIGHT + m * K.D, vx = Lp / Tm, th = m * maxAng, half = coreH / 2 - 2;
+    const yOf = x => {
+      if (S.type === "sm" || th === 0) return S.type === "sm" ? (mi - 1) * .9 : 0;
+      const per = 2 * (2 * half) / Math.tan(th); let p = ((x * 1) % per + per) % per;
+      const ph = p / per; return ph < .25 ? ph * 4 * half : ph < .75 ? half - (ph - .25) * 4 * half : -half + (ph - .75) * 4 * half;
+    };
+    const col = S.type === "sm" ? ["#b45cff", "#d46bff", "#f08aff"][mi] : beam;
+    for (let i = 0; i < N; i++) {
+      if (!bits[i]) continue;
+      const a = Math.max(0, t - i - 1) * vx, b = Math.min(Tm, t - i) * vx;
+      if (t - i <= 0 || b <= a || a >= Lp) continue;
+      for (let x = a; x < Math.min(b, Lp); x += 3) {
+        const x2 = Math.min(x + 3, b, Lp), att = 10 ** (-(f.alpha * S.dist) * (x / Lp) / 20), al = (.18 + .82 * att) * (S.type === "mm" ? (mi ? .7 : .95) : .75);
+        fx.strokeStyle = hexA(col, al); fx.lineWidth = S.type === "mm" ? 2.6 : 2.2; fx.shadowColor = col; fx.shadowBlur = 10;
+        fx.beginPath(); fx.moveTo(x0 + x, cy + yOf(x)); fx.lineTo(x0 + x2, cy + yOf(x2)); fx.stroke();
+      }
+    }
+  });
+  fx.restore();
+  // etiquetas de bits en vuelo
+  const v0 = Lp / FLIGHT; fx.font = "800 12px 'JetBrains Mono', monospace"; fx.textAlign = "center";
+  for (let i = 0; i < N; i++) { const x = (t - i - .5) * v0; if (x < 0 || x > Lp) continue;
+    fx.fillStyle = bits[i] ? css("--fg") : hexA("#8b9cb1", .6); fx.fillText(bits[i], x0 + x, cy - clH / 2 - 18); }
+  fx.textAlign = "left";
+  // emisor
+  const cur = Math.floor(t), on = cur >= 0 && cur < N && bits[cur];
+  box(8, cy - 40, tw - 8, 80, S.type === "mm" ? "EMISOR" : "LÁSER", `${f.lambda} nm`);
+  if (on) { const rg = fx.createRadialGradient(x0 - 2, cy, 0, x0 - 2, cy, 34); rg.addColorStop(0, hexA(beam, .95)); rg.addColorStop(1, hexA(beam, 0)); fx.fillStyle = rg; fx.beginPath(); fx.arc(x0 - 2, cy, 34, 0, 7); fx.fill(); }
+  fx.fillStyle = on ? beam : "#2a3646"; fx.fillRect(x0 - 8, cy - 7, 8, 14);
+  fx.font = "700 11px 'JetBrains Mono', monospace"; fx.fillStyle = css("--muted");
+  if (cur >= 0 && cur < N) fx.fillText(`bit ${cur + 1}/${N}: ${bits[cur]}`, 8, cy + 58);
+  // receptor
+  const rxT = t - FLIGHT, yv = rxT > 0 && rxT < N + K.D + 1 ? Math.max(0, yAt(rxT)) : 0;
+  box(x1 + 6, cy - 40, tw - 8, 80, "FOTODIODO", "PIN / APD");
+  if (yv > .02) { const rg = fx.createRadialGradient(x1 + 2, cy, 0, x1 + 2, cy, 30); rg.addColorStop(0, hexA(beam, Math.min(.9, yv * .9))); rg.addColorStop(1, hexA(beam, 0)); fx.fillStyle = rg; fx.beginPath(); fx.arc(x1 + 2, cy, 30, 0, 7); fx.fill(); }
+  fx.fillStyle = "#2a3646"; fx.fillRect(x1, cy - 7, 8, 14);
+  const done = samples.filter(s => s.ts <= rxT).length;
+  if (done) { fx.fillStyle = rxBits[done - 1] === bits[done - 1] ? css("--ok") : css("--bad"); fx.font = "700 11px 'JetBrains Mono', monospace"; fx.fillText(`decide: ${rxBits[done - 1]}`, x1 + 6, cy + 58); }
+}
+function box(x, y, w, h, t1, t2) {
+  fx.fillStyle = css("--panel2"); fx.strokeStyle = css("--line"); fx.lineWidth = 1;
+  fx.beginPath(); fx.roundRect ? fx.roundRect(x, y, w, h, 6) : fx.rect(x, y, w, h); fx.fill(); fx.stroke();
+  fx.fillStyle = css("--fg"); fx.font = "700 10px 'JetBrains Mono', monospace"; fx.fillText(t1, x + 6, y + 16);
+  fx.fillStyle = css("--muted"); fx.font = "600 10px 'JetBrains Mono', monospace"; fx.fillText(t2, x + 6, y + 30);
+}
+
+/* ---------- Canvas: osciloscopio ---------- */
+const sc = $("scope"), sw = $("scope-wrap");
+function drawScope() {
+  const pl = 34, pr = 14, span = N + K.D + 1, pxb = Math.max(15, (sw.clientWidth - pl - pr) / span);
+  const W = Math.ceil(pl + pr + span * pxb), H = 230, sx = fit(sc, W, H);
+  const top = 22, bot = H - 40, X = tau => pl + tau * pxb, Y = v => bot - (v / 1.25) * (bot - top);
+  const rxT = S.t - FLIGHT, beam = K.f.beam;
+  sx.clearRect(0, 0, W, H);
+  sx.font = "600 10px 'JetBrains Mono', monospace"; sx.fillStyle = css("--muted");
+  [[0, "0"], [.5, "0,5"], [1, "1"]].forEach(([v, l]) => { sx.strokeStyle = "#16212e"; sx.beginPath(); sx.moveTo(pl, Y(v)); sx.lineTo(W - pr, Y(v)); sx.stroke(); sx.fillText(l, 6, Y(v) + 3); });
+  // bytes
+  for (let k = 0; k <= N / 8; k++) { const x = X(k * 8 + K.D / 2); sx.strokeStyle = "#233243"; sx.setLineDash([2, 3]); sx.beginPath(); sx.moveTo(x, top - 8); sx.lineTo(x, bot); sx.stroke(); sx.setLineDash([]); if (k < N / 8) { sx.fillStyle = css("--muted"); sx.fillText(`byte ${k + 1}`, x + 4, top - 8); } }
+  // enviado
+  sx.strokeStyle = "rgba(139,156,177,.45)"; sx.setLineDash([4, 4]); sx.beginPath();
+  bits.forEach((b, i) => { const x = X(i + K.D / 2), y = Y(b); i ? sx.lineTo(x, y) : sx.moveTo(x, y); sx.lineTo(X(i + 1 + K.D / 2), y); });
+  sx.stroke(); sx.setLineDash([]);
+  // umbral
+  sx.strokeStyle = css("--amber"); sx.setLineDash([6, 4]); sx.beginPath(); sx.moveTo(pl, Y(S.thr)); sx.lineTo(W - pr, Y(S.thr)); sx.stroke(); sx.setLineDash([]);
+  // recibido
+  const lim = Math.min(span, rxT);
+  if (lim > 0) {
+    sx.save(); sx.strokeStyle = beam; sx.lineWidth = 1.8; sx.shadowColor = beam; sx.shadowBlur = 6; sx.beginPath();
+    for (let k = 0; k <= lim * R; k++) { const tau = k / R, v = yAt(tau) + K.sig * noise[k]; k ? sx.lineTo(X(tau), Y(Math.max(-.2, Math.min(1.3, v)))) : sx.moveTo(X(tau), Y(v)); }
+    sx.stroke(); sx.restore();
+  }
+  // muestras
+  sx.font = "800 11px 'JetBrains Mono', monospace"; sx.textAlign = "center";
+  samples.forEach((s, i) => { if (s.ts > rxT) return; const ok = rxBits[i] === bits[i], c = ok ? css("--ok") : css("--bad");
+    sx.fillStyle = c; sx.beginPath(); sx.arc(X(s.ts), Y(Math.max(-.2, Math.min(1.3, s.v))), 3.5, 0, 7); sx.fill();
+    sx.fillText(rxBits[i], X(s.ts), bot + 18); if (!ok) { sx.font = "600 9px 'JetBrains Mono', monospace"; sx.fillText("error", X(s.ts), bot + 31); sx.font = "800 11px 'JetBrains Mono', monospace"; } });
+  sx.textAlign = "left";
+  if (S.running && rxT > 0) { const target = X(rxT) - sw.clientWidth * .65; if (Math.abs(sw.scrollLeft - target) > 4) sw.scrollLeft = target; }
+}
+
+/* ---------- Decodificación ---------- */
+let lastDone = -1, lastSel = -1;
+const role = b => b < 0x80 ? "ASCII: empieza con 0" : (b & 0xE0) === 0xC0 ? "UTF-8: inicio de 2 bytes (110…)" : (b & 0xF0) === 0xE0 ? "UTF-8: inicio de 3 bytes (1110…)" : (b & 0xF8) === 0xF0 ? "UTF-8: inicio de 4 bytes (11110…)" : (b & 0xC0) === 0x80 ? "UTF-8: continuación (10…)" : "byte inválido en UTF-8";
+const show = b => b >= 32 && b < 127 ? (b === 32 ? "␣" : String.fromCharCode(b)) : "·";
+const escH = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function updateDecode(force) {
+  const rxT = S.t - FLIGHT, done = samples.filter(s => s.ts <= rxT).length;
+  if (done === lastDone && S.sel === lastSel && !force) return;
+  lastDone = done; lastSel = S.sel;
+  const nb = Math.floor(done / 8), rx = [];
+  for (let k = 0; k < nb; k++) { let v = 0; for (let j = 0; j < 8; j++) v = v * 2 + rxBits[k * 8 + j]; rx.push(v); }
+  let rows = "";
+  for (let k = 0; k < bytesTx.length; k++) {
+    const have = Math.min(8, Math.max(0, done - k * 8));
+    if (!have) break;
+    let bh = "";
+    for (let j = 0; j < 8; j++) { const i = k * 8 + j; if (j >= have) { bh += `<s>·</s>`; } else { const b = rxBits[i]; bh += b !== bits[i] ? `<span class="x">${b}</span>` : b ? `<b>${b}</b>` : `<s>0</s>`; } if (j === 3) bh += `<span class="nib"></span>`; }
+    const full = have === 8, v = full ? rx[k] : null, ok = full && v === bytesTx[k];
+    rows += `<tr tabindex="0" data-k="${k}" class="${k === S.sel ? "sel" : ""}"><td class="m">${k + 1}</td><td class="bits">${bh}</td><td class="m">${full ? "0x" + v.toString(16).toUpperCase().padStart(2, "0") : "…"}</td><td class="m">${full ? v : "…"}</td><td class="m">${show(bytesTx[k])}</td><td class="m ${full ? ok ? "okc" : "badc" : ""}">${full ? show(v) + (ok ? " ✓" : " ✗") : "…"}</td></tr>`;
+  }
+  $("bytes").innerHTML = rows || `<tr><td colspan="6" class="muted">Esperando que llegue el primer bit al fotodiodo…</td></tr>`;
+  // texto
+  const txChars = [...(S.msg || " ")], dec = new TextDecoder("utf-8").decode(new Uint8Array(rx));
+  const allDone = nb === bytesTx.length, errs = rxBits.slice(0, done).filter((b, i) => b !== bits[i]).length;
+  let out = "";
+  if (allDone) { const rc = [...dec]; rc.forEach((c, i) => { out += `<span class="c${c !== txChars[i] ? " err" : ""}">${c === " " ? "␣" : escH(c)}</span>`; }); }
+  else { [...dec].forEach(c => out += `<span class="c">${c === " " ? "␣" : escH(c)}</span>`); for (let i = [...dec].length; i < txChars.length; i++) out += `<span class="c wait">?</span>`; }
+  $("rxtext").innerHTML = out;
+  $("dec-cap").innerHTML = `${done} de ${N} bits recibidos · <span class="${errs ? "badc" : "okc"}">${errs} ${errs === 1 ? "bit erróneo" : "bits erróneos"}</span>${allDone ? (dec === (S.msg || " ") ? " · mensaje intacto" : " · el mensaje llegó dañado") : ""}`;
+  // pesos
+  const k = Math.min(S.sel, Math.max(0, nb - 1));
+  if (!nb) { $("wpanel").innerHTML = `<p class="note">Cuando se complete el primer byte (8 bits) vas a ver acá cómo se convierte a número y a carácter.</p>`; return; }
+  const v = rx[k], tx = bytesTx[k], bitsK = [...Array(8)].map((_, j) => rxBits[k * 8 + j]), parts = [];
+  const cells = bitsK.map((b, j) => { const w = 2 ** (7 - j); if (b) parts.push(w); return `<div class="w${b ? " on" : ""}${b !== bits[k * 8 + j] ? " err" : ""}"><small>2<sup>${7 - j}</sup>=${w}</small><b>${b}</b><span>${b ? w : 0}</span></div>`; }).join("");
+  const hi = v >> 4, lo = v & 15, hb = bitsK.slice(0, 4).join(""), lb = bitsK.slice(4).join("");
+  $("wpanel").innerHTML = `<h3>Byte ${k + 1}: de binario a número</h3><div class="weights">${cells}</div>
+    <div class="sum">${parts.length ? parts.join(" + ") : "0"} = <span class="big">${v}</span><br>
+    ${hb} → ${hi.toString(16).toUpperCase()} · ${lb} → ${lo.toString(16).toUpperCase()} = <b>0x${v.toString(16).toUpperCase().padStart(2, "0")}</b><br>
+    ${role(v)}${v < 0x80 ? ` → <span class="big">${show(v)}</span>` : ""}</div>
+    <p class="note">Cada posición vale el doble que la de su derecha: 1, 2, 4… hasta 128. Se suman los pesos donde hay un 1. Cada grupo de 4 bits es un dígito hexadecimal.${v !== tx ? ` <b class="badc">Se envió 0x${tx.toString(16).toUpperCase().padStart(2, "0")} (${tx}, “${show(tx)}”): los bits marcados en rojo cayeron del otro lado del umbral.</b>` : ""} Los enlaces reales no mandan los bytes así nomás: Gigabit usa 8b/10b y 10 Gigabit usa 64b/66b, que agregan bits para que no haya rachas largas de ceros o unos y el receptor no pierda el reloj.</p>`;
+}
+$("bytes").addEventListener("click", e => { const tr = e.target.closest("tr[data-k]"); if (tr) { S.sel = +tr.dataset.k; updateDecode(true); } });
+$("bytes").addEventListener("keydown", e => { const tr = e.target.closest("tr[data-k]"); if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); S.sel = +tr.dataset.k; updateDecode(true); document.querySelector(`tr[data-k="${S.sel}"]`)?.focus(); } });
+
+/* ---------- Reflexión total interna ---------- */
+function drawTIR() {
+  const a = +$("ang").value, f = F[S.type], n1 = f.n1, n2 = f.n2, thc = Math.asin(n2 / n1) * 180 / Math.PI, r = a * Math.PI / 180;
+  $("ang-o").textContent = `${nf(a)}°`;
+  const Px = 180, Py = 110, Lr = 120, tot = a >= thc, beam = f.beam;
+  const inc = [Px - Lr * Math.sin(r), Py + Lr * Math.cos(r)], refl = [Px + Lr * Math.sin(r), Py + Lr * Math.cos(r)];
+  let refr = "", t2 = 0;
+  if (!tot) { t2 = Math.asin(n1 * Math.sin(r) / n2); refr = `<line x1="${Px}" y1="${Py}" x2="${Px + Lr * Math.sin(t2)}" y2="${Py - Lr * Math.cos(t2)}" stroke="${beam}" stroke-width="3" stroke-opacity=".9"/>`; }
+  const crit = [Px - 70 * Math.sin(thc * Math.PI / 180), Py + 70 * Math.cos(thc * Math.PI / 180)];
+  $("tir-svg").innerHTML = `
+    <rect x="0" y="0" width="360" height="${Py}" fill="var(--clad)"/><rect x="0" y="${Py}" width="360" height="${210 - Py}" fill="var(--glass)"/>
+    <line x1="0" y1="${Py}" x2="360" y2="${Py}" stroke="#3b6a90" stroke-width="1.5"/>
+    <line x1="${Px}" y1="12" x2="${Px}" y2="205" stroke="#4b5d72" stroke-dasharray="4 4"/>
+    <text x="10" y="22" class="tlab">revestimiento · n₂ = ${nf(n2, 4)}</text><text x="10" y="200" class="tlab">núcleo · n₁ = ${nf(n1, 4)}</text>
+    <text x="${Px + 6}" y="24" class="tlab">normal</text>
+    <line x1="${Px}" y1="${Py}" x2="${crit[0]}" y2="${crit[1]}" stroke="var(--amber)" stroke-dasharray="3 3"/>
+    <text x="${crit[0] - 4}" y="${crit[1] - 6}" class="tlab" text-anchor="end" style="fill:var(--amber)">θc ${nf(thc)}°</text>
+    <line x1="${inc[0]}" y1="${inc[1]}" x2="${Px}" y2="${Py}" stroke="${beam}" stroke-width="3"/>
+    <line x1="${Px}" y1="${Py}" x2="${refl[0]}" y2="${refl[1]}" stroke="${beam}" stroke-width="3" stroke-opacity="${tot ? 1 : .25}"/>
+    ${refr}<circle cx="${Px}" cy="${Py}" r="3.5" fill="#fff"/>
+    <text x="350" y="${Py - 10}" text-anchor="end" class="tval" style="fill:${tot ? "var(--ok)" : "var(--bad)"}">${tot ? "rebota entera" : "parte se escapa"}</text>`;
+  $("tir-txt").innerHTML = tot
+    ? `<b class="okc">Reflexión total interna.</b> A ${nf(a)}° supera el ángulo crítico de ${nf(thc)}° de la fibra ${F[S.type].short.toLowerCase()}: toda la luz vuelve al núcleo y sigue viaje.`
+    : `<b class="badc">Refracción.</b> A ${nf(a)}° está por debajo del ángulo crítico (${nf(thc)}°). Parte de la luz sale al revestimiento a ${nf(t2 * 180 / Math.PI)}° y se pierde. Es lo que pasa cuando una fibra se dobla demasiado.`;
+}
+$("ang").addEventListener("input", drawTIR);
+
+/* ---------- Bucle ---------- */
+function draw() { drawFiber(); drawScope(); updateDecode(); }
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (S.running) { S.t += dt * S.speed; if (S.t >= endT()) { S.t = endT(); S.running = false; syncPause(); } draw(); }
+  requestAnimationFrame(loop);
+}
+const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+setType("mm", true);
+if (reduce) { S.running = false; S.t = FLIGHT + 14; }
+syncPause(); draw(); drawTIR();
+const origSetType = setType;
+$("t-mm").onclick = () => { origSetType("mm"); drawTIR(); draw(); };
+$("t-sm").onclick = () => { origSetType("sm"); drawTIR(); draw(); };
+new ResizeObserver(() => draw()).observe(fc);
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Pila OSI interactiva</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Martian+Mono:wght@400;600;800&display=swap">
+<style>
+/* Layout: escenario isométrico con 7 placas ilustradas (separables/apilables) + panel de detalle; debajo, simulador de encapsulación y práctica. */
+:root{
+  --bg:#eaf0f3; --panel:#f9fbfc; --fg:#132033; --muted:#55657a; --line:#cfd9e2; --accent:#2f63c8;
+  --stage-a:#ffffff; --stage-b:#dde7f0;
+  --ok:#1d7a3a; --bad:#b3332a;
+  /* Placas: mismos colores en ambos temas, son ilustración */
+  --p7:#f6c445; --p6:#1fb5a8; --p5:#d0479b; --p4:#8a4fd0; --p3:#2f9e5b; --p2:#2f63c8; --p1:#ef6a2c;
+  --ink:#172036; --paper:#ffffff;
+  --display:"Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --body:"Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1220; --panel:#141c2d; --fg:#e4eaf4; --muted:#97a4ba; --line:#28334a; --accent:#7ea6ff;
+  --stage-a:#1c2740; --stage-b:#0c1220; --ok:#5bc77c; --bad:#ef7a70; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0c1220; --panel:#141c2d; --fg:#e4eaf4; --muted:#97a4ba; --line:#28334a; --accent:#7ea6ff;
+  --stage-a:#1c2740; --stage-b:#0c1220; --ok:#5bc77c; --bad:#ef7a70; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-0.02em}
+h1{font-size:clamp(1.5rem,4vw,2.2rem);font-weight:800}
+h2{font-size:1.15rem;font-weight:800}
+p{margin:0}
+.eyebrow{font-family:var(--display);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:8px;max-width:70ch}
+header p{color:var(--muted)}
+kbd{font-family:var(--display);font-size:.72em;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 .35em;background:var(--panel)}
+
+/* ---------- Escenario ---------- */
+.main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:start}
+.stage{border-radius:10px;border:1px solid var(--line);background:radial-gradient(120% 90% at 40% 30%,var(--stage-a),var(--stage-b));padding:14px 14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.stage-bar{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+#stack{width:100%;height:auto;display:block;overflow:visible}
+.plate{cursor:pointer;outline:none;transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+.lift{transition:transform .25s ease,filter .25s ease;animation:drop .7s cubic-bezier(.2,.9,.3,1.2) backwards}
+.plate:hover .lift{transform:translateY(-6px)}
+.plate.sel .lift{transform:translateY(-10px);filter:drop-shadow(0 10px 14px rgba(10,20,40,.35))}
+.plate .top{stroke:transparent;stroke-width:3;transition:stroke .2s}
+.plate.sel .top{stroke:var(--paper)}
+.plate:focus-visible .top{stroke:var(--accent);stroke-width:4}
+.plate.sim .top{stroke:var(--paper);stroke-dasharray:8 6;animation:dash 1s linear infinite}
+.lbl-n{font:600 19px var(--body);fill:var(--fg)}
+.lbl-s{font:500 12px var(--display);fill:var(--muted);transition:opacity .3s}
+.plate.sel .lbl-n{font-weight:700}
+svg.compact .lbl-s{opacity:0}
+.tg{font:700 10px var(--display);fill:var(--ink)}
+.sm{font:700 7.5px var(--display);fill:var(--ink)}
+.bin{font:700 11px var(--display);fill:var(--paper);opacity:.75;letter-spacing:.06em}
+.flow{stroke-dasharray:5 7;animation:dash 1.4s linear infinite}
+.bob{animation:bob 3.2s ease-in-out infinite}
+.hop{animation:hop 1.6s ease-in-out infinite}
+.wave{animation:wave 1.8s ease-in-out infinite}
+.pulse{animation:pulse 1.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+#pk{transition:transform .6s cubic-bezier(.3,.8,.3,1)}
+@keyframes dash{to{stroke-dashoffset:-24}}
+@keyframes bob{50%{transform:translateY(-4px)}}
+@keyframes hop{0%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+@keyframes wave{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.5);opacity:0}}
+@keyframes drop{from{transform:translateY(-60px)}}
+.legend{color:var(--muted);font-size:.82rem}
+
+/* ---------- Panel ---------- */
+.detail{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+.d-head{background:var(--c);color:var(--on);padding:18px 20px;display:flex;gap:16px;align-items:center}
+.d-head .big{font-family:var(--display);font-weight:800;font-size:2.6rem;line-height:1}
+.d-head h2{font-size:1.3rem}
+.d-head .en{font-size:.8rem;opacity:.85}
+.d-body{padding:18px 20px 22px;display:flex;flex-direction:column;gap:16px}
+.d-body .lead{font-size:1rem;max-width:62ch}
+.row{display:flex;flex-direction:column;gap:6px}
+.row h3{font-family:var(--display);font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--display);font-size:.72rem;padding:3px 8px;border-radius:4px;border:1px solid color-mix(in oklab,var(--c) 55%,var(--line));background:color-mix(in oklab,var(--c) 14%,transparent)}
+.d-body ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:3px}
+.cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.note{border-top:1px solid var(--line);padding-top:12px;font-size:.88rem;color:var(--muted)}
+.note b{color:var(--fg)}
+code{font-family:var(--display);font-size:.8em}
+
+/* ---------- Simulador ---------- */
+section{display:flex;flex-direction:column;gap:14px}
+.sec-head{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:end;justify-content:space-between}
+.sec-head p{color:var(--muted);max-width:62ch}
+.seg-ctl{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg-ctl button{all:unset;cursor:pointer;padding:6px 12px;font-size:.85rem;background:var(--panel)}
+.seg-ctl button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.seg-ctl button:focus-visible,.btn:focus-visible,.qopt:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sim-box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:16px}
+.track{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+.host{font-family:var(--display);font-size:.7rem;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:4px;align-items:center}
+.host i{display:block;width:34px;height:26px;border:2px solid currentColor;border-radius:3px;position:relative}
+.host i::after{content:"";position:absolute;left:8px;right:8px;bottom:-7px;height:3px;background:currentColor}
+.host.on{color:var(--fg)}
+.lane{position:relative;height:6px;background:repeating-linear-gradient(90deg,var(--line) 0 8px,transparent 8px 14px);border-radius:3px}
+.dot{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:var(--c,var(--accent));transform:translate(-50%,-50%);transition:left .6s ease,background .3s}
+.pkt-scroll{overflow-x:auto;padding-bottom:4px}
+.pkt{display:flex;min-height:64px;width:max-content;min-width:100%}
+.seg{border:2px solid var(--c);background:color-mix(in oklab,var(--c) 18%,var(--panel));padding:6px 10px;display:flex;flex-direction:column;justify-content:center;gap:2px;margin-right:-2px;animation:pop .35s ease}
+.seg .t{font-family:var(--display);font-size:.6rem;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.seg .v{font-family:var(--display);font-size:.75rem;white-space:nowrap}
+.seg.data{flex:1 0 auto;background:var(--panel)}
+.seg.ghost{border-style:dashed;background:transparent}
+.seg.hot{box-shadow:inset 0 0 0 2px var(--c);background:color-mix(in oklab,var(--c) 38%,var(--panel))}
+.seg.leaving{opacity:.45;text-decoration:line-through}
+@keyframes pop{from{transform:translateY(-6px);opacity:.3}to{transform:none;opacity:1}}
+.bits{font-family:var(--display);font-size:.72rem;color:var(--muted);overflow:hidden;white-space:nowrap;letter-spacing:.08em}
+.step-txt{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:center}
+.step-txt .k{font-family:var(--display);font-weight:800;font-size:1.1rem;background:var(--c);color:var(--on);border-radius:6px;padding:4px 9px;line-height:1.2}
+.step-txt b{font-size:1rem}
+.step-txt p{grid-column:2;color:var(--muted);max-width:70ch}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{all:unset;cursor:pointer;padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--bg);font-weight:600;font-size:.88rem}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.btn[disabled]{opacity:.4;cursor:default}
+.progress{font-family:var(--display);font-size:.72rem;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+
+/* ---------- Práctica ---------- */
+.quiz{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.q-item{font-family:var(--display);font-size:clamp(1.1rem,3vw,1.5rem);font-weight:800}
+.qopts{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.qopt{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;padding:10px 4px;border-radius:6px;border:2px solid var(--c);font-family:var(--display);font-weight:800;font-size:1rem;display:flex;flex-direction:column;gap:2px}
+.qopt small{font-family:var(--body);font-weight:500;font-size:.68rem;color:var(--muted)}
+.qopt:hover{background:color-mix(in oklab,var(--c) 16%,transparent)}
+.qopt.right{background:var(--c);color:var(--on)} .qopt.right small{color:var(--on)}
+.qopt.wrong{opacity:.35}
+.q-fb{min-height:1.5em}
+.q-fb.ok b{color:var(--ok)} .q-fb.no b{color:var(--bad)}
+.q-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.score{font-family:var(--display);font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ---------- Laboratorio binario ---------- */
+.ltabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.ltab{all:unset;box-sizing:border-box;cursor:pointer;flex:1 0 auto;padding:8px 12px;border-radius:6px;border:2px solid var(--c);font-family:var(--display);font-weight:800;font-size:.85rem;text-align:center;white-space:nowrap}
+.ltab small{font-family:var(--body);font-weight:500;color:var(--muted);margin-left:6px}
+.ltab:hover{background:color-mix(in oklab,var(--c) 16%,transparent)}
+.ltab[aria-pressed="true"]{background:var(--c);color:var(--on)} .ltab[aria-pressed="true"] small{color:var(--on)}
+.lab{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.lab-main{display:flex;flex-direction:column;gap:14px;min-width:0}
+.lab-main h3{font-family:var(--display);font-size:1rem}
+.lab-main .intro{color:var(--muted);max-width:66ch}
+.res-wrap{display:flex;flex-direction:column;gap:14px;min-width:0}
+.fld{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-weight:600;font-size:.88rem}
+.fld input:not([type=range]){font:600 .95rem var(--display);padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);min-width:0;width:min(100%,15em)}
+.fld input:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.fld input[type=range]{accent-color:var(--c);width:min(100%,14em)}
+.tbl{overflow-x:auto}
+.tbl table{border-collapse:collapse;font-size:.85rem}
+.tbl th,.tbl td{text-align:left;padding:6px 14px 6px 0;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+.tbl th{font-family:var(--display);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums}
+.ch{font-family:var(--display);font-weight:800;font-size:1.05rem}
+.bits-v{display:inline-flex;flex-wrap:wrap;gap:4px 10px;font-family:var(--display);font-size:.85rem;vertical-align:middle}
+.byte{display:inline-flex;white-space:nowrap}
+.byte i{font-style:normal;width:.8em;text-align:center;border-radius:2px}
+.byte i.nib{margin-right:.35em}
+.b0{color:var(--muted)} .b1{color:var(--fg);font-weight:800}
+.byte i.hl{background:color-mix(in oklab,var(--c) 38%,transparent)}
+.byte i.dim{opacity:.35}
+.byte i.flip{background:var(--bad);color:var(--bg)}
+.toggles{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+.tbit{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:6px 2px;text-align:center;display:flex;flex-direction:column;gap:2px;background:var(--bg);min-width:0}
+.tbit b{font-family:var(--display);font-size:1.1rem}
+.tbit small{font-size:.6rem;color:var(--muted);line-height:1.2;overflow-wrap:anywhere}
+.tbit[aria-pressed="true"]{background:color-mix(in oklab,var(--c) 32%,var(--bg));border-color:var(--c)}
+.tbit[disabled]{opacity:.45;cursor:not-allowed}
+.tbit:focus-visible,.ltab:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.btn.sm{padding:5px 10px;font-size:.8rem}
+.line{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:.92rem}
+.lk{font-family:var(--display);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);min-width:7.5em}
+.callout{background:color-mix(in oklab,var(--c) 11%,transparent);border-radius:6px;padding:10px 12px;font-size:.88rem;max-width:70ch}
+.ok-t{color:var(--ok);font-weight:700} .no-t{color:var(--bad);font-weight:700}
+.g6wrap{display:flex;flex-wrap:wrap;gap:6px}
+.g6{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-family:var(--display);font-size:.78rem}
+.g6 small{color:var(--muted)} .g6 b{font-size:1.1rem}
+.macs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.macb{border:1px solid var(--line);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.macb b{font-family:var(--display);font-size:1.05rem}
+.macb small{color:var(--muted);font-size:.7rem}
+.macb.oui{background:color-mix(in oklab,var(--c) 11%,transparent)}
+.sigbox{overflow-x:auto}
+.sigbox svg{width:100%;min-width:380px;height:auto;display:block}
+.wl{font:600 12px var(--body);fill:var(--fg)} .wb{font:700 12px var(--display);fill:var(--muted)}
+.lab-w{display:flex;flex-direction:column;gap:10px;border-left:1px solid var(--line);padding-left:18px;min-width:0}
+.lab-w h3{font-family:var(--display);font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0}
+.wrow{display:grid;grid-template-columns:1.9rem minmax(0,1fr);gap:3px 8px;align-items:center;font-size:.76rem}
+.wrow .n{font-family:var(--display);font-weight:800;text-align:center;border-radius:4px;background:var(--c);color:var(--on);padding:1px 0}
+.wbar{height:10px;border-radius:3px;background:var(--c);transition:width .3s}
+.wrow .meta{grid-column:2;color:var(--muted);font-variant-numeric:tabular-nums}
+.wrow:not(.cur){opacity:.62} .wrow.cur .meta{color:var(--fg)}
+@media (max-width:760px){
+  .lab{grid-template-columns:minmax(0,1fr)}
+  .lab-w{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px}
+}
+
+@media (max-width:900px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .detail{position:static}
+}
+@media (max-width:520px){
+  .cols2{grid-template-columns:minmax(0,1fr)}
+  .qopts{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .qopt small{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Redes · referencia ISO/IEC 7498-1</span>
+    <h1>Pila OSI interactiva</h1>
+    <p>Tocá una placa para ver qué hace esa capa, con qué protocolos y equipos se cruza, cómo se rompe y con qué la diagnosticás. Con <kbd>↑</kbd> <kbd>↓</kbd> te movés entre capas. Abajo seguís un mensaje bajando y subiendo por la pila.</p>
+  </header>
+
+  <div class="main">
+    <div class="stage">
+      <div class="stage-bar">
+        <span class="eyebrow">7 capas · de la app al cable</span>
+        <div class="seg-ctl" role="group" aria-label="Vista de la pila">
+          <button type="button" id="v-sep" aria-pressed="true">Separadas</button>
+          <button type="button" id="v-api" aria-pressed="false">Apiladas</button>
+        </div>
+      </div>
+      <svg id="stack" viewBox="0 0 725 895" role="group" aria-label="Pila del modelo OSI en vista isométrica"></svg>
+      <p class="legend">Mnemotecnia de arriba hacia abajo: <b>A</b>ll <b>P</b>eople <b>S</b>eem <b>T</b>o <b>N</b>eed <b>D</b>ata <b>P</b>rocessing. En castellano, de abajo hacia arriba: <b>F</b>ede <b>E</b>nvía <b>R</b>uedas <b>T</b>arde, <b>S</b>iempre <b>P</b>ide <b>A</b>yuda.</p>
+    </div>
+    <article class="detail" id="detail" aria-live="polite"></article>
+  </div>
+
+  <section aria-labelledby="sim-h">
+    <div class="sec-head">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span class="eyebrow">Encapsulación y desencapsulación</span>
+        <h2 id="sim-h">El viaje de un mensaje</h2>
+        <p>Cada capa del emisor le suma su encabezado a lo que recibe de arriba. El receptor hace lo inverso. El sobre que se mueve en la pila de arriba te marca en qué capa está.</p>
+      </div>
+      <div class="seg-ctl" role="group" aria-label="Escenario">
+        <button type="button" id="sc-web" aria-pressed="true">Webhook de Make</button>
+        <button type="button" id="sc-iot" aria-pressed="false">Sensor en el viñedo</button>
+      </div>
+    </div>
+    <div class="sim-box">
+      <div class="track">
+        <div class="host" id="h-a"><i></i><span id="h-a-n">Make</span></div>
+        <div class="lane"><div class="dot" id="dot" style="left:0%"></div></div>
+        <div class="host" id="h-b"><i></i><span id="h-b-n">API de WhatsApp</span></div>
+      </div>
+      <div class="pkt-scroll"><div class="pkt" id="pkt"></div></div>
+      <div class="bits" id="bits" hidden></div>
+      <div class="step-txt" id="step"></div>
+      <div class="ctrls">
+        <button type="button" class="btn" id="prev">← Anterior</button>
+        <button type="button" class="btn primary" id="next">Siguiente →</button>
+        <button type="button" class="btn" id="play">Reproducir</button>
+        <button type="button" class="btn" id="reset">Reiniciar</button>
+        <span class="progress" id="prog"></span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="bin-h">
+    <div class="sec-head">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span class="eyebrow">Binario</span>
+        <h2 id="bin-h">Los bits entre capa y capa</h2>
+        <p>Elegí una capa para ver qué bits agrega o transforma, y tocalos para ver qué cambia. El mensaje que escribas en la capa 7 baja por todas las demás. La pestaña sigue a la placa que elijas en la pila.</p>
+      </div>
+    </div>
+    <div class="ltabs" id="ltabs" role="group" aria-label="Capa del laboratorio binario"></div>
+    <div class="lab" id="lab">
+      <div class="lab-main" id="lab-main"></div>
+      <aside class="lab-w"><h3>Cuánto pesa el mensaje en cada capa</h3><div id="lab-w" style="display:flex;flex-direction:column;gap:9px"></div></aside>
+    </div>
+  </section>
+
+  <section aria-labelledby="q-h">
+    <div class="sec-head">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span class="eyebrow">Práctica</span>
+        <h2 id="q-h">¿En qué capa vive?</h2>
+        <p>Elegí la capa OSI de cada protocolo, equipo o concepto. Hay casos discutidos (ARP, TLS) y te explico por qué.</p>
+      </div>
+    </div>
+    <div class="quiz">
+      <div class="q-item" id="q-item"></div>
+      <div class="qopts" id="qopts"></div>
+      <p class="q-fb" id="q-fb"></p>
+      <div class="q-foot">
+        <button type="button" class="btn primary" id="q-next">Otra</button>
+        <span class="score" id="score">0 de 0</span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const L = {
+  7:{n:"Aplicación",en:"Application",pdu:"Datos",tcp:"Aplicación",
+    lead:"Es la capa que ven las aplicaciones. Define cómo se piden y se entregan servicios de red: una página web, un mail, una consulta DNS o un webhook.",
+    does:["Ofrece servicios de red a los programas","Define el formato de pedidos y respuestas (métodos, códigos de estado)","Identifica recursos: URLs, casillas de mail, nombres de dominio"],
+    protos:["HTTP / HTTPS","DNS","SMTP · IMAP","FTP","SSH","DHCP","MQTT","SNMP"],
+    devices:"Hosts, servidores, proxies, firewalls de capa 7 (WAF)",
+    breaks:"Error 401 por API key vencida, 404 por URL mal escrita, 500 del servidor, DNS que no resuelve.",
+    tool:"nslookup / dig, curl, el historial de ejecuciones de Make o n8n",
+    work:"Cuando un módulo <b>HTTP › Make a request</b> de Make devuelve 401 o 429, el problema está acá: credenciales o límite de pedidos de la API."},
+  6:{n:"Presentación",en:"Presentation",pdu:"Datos",tcp:"Aplicación",
+    lead:"Traduce los datos a un formato que ambos extremos entiendan. Se encarga de codificación de caracteres, serialización, compresión y cifrado.",
+    does:["Codifica caracteres (UTF-8, ASCII)","Serializa estructuras (JSON, XML)","Comprime y cifra los datos"],
+    protos:["TLS (cifrado)","UTF-8","JSON · XML","JPEG · PNG","gzip","MIME"],
+    devices:"Sin equipo propio: lo resuelve el software de cada extremo",
+    breaks:"Tildes que llegan como “Ã©”, JSON mal formado, certificado TLS vencido o con nombre que no coincide.",
+    tool:"openssl s_client, validadores de JSON, el inspector de datos de Make",
+    work:"Si un webhook llega con “BuenÃ³s Aires”, alguien mandó Latin-1 y el otro leyó UTF-8. Es un problema de capa 6, no de tu escenario."},
+  5:{n:"Sesión",en:"Session",pdu:"Datos",tcp:"Aplicación",
+    lead:"Abre, mantiene y cierra el diálogo entre dos aplicaciones. Controla quién habla y cuándo, y puede retomar una conversación cortada desde un punto de control.",
+    does:["Establece y cierra sesiones","Sincroniza con puntos de control","Maneja el turno de diálogo (simplex, half o full duplex)"],
+    protos:["RPC","NetBIOS","PPTP","SIP (control de llamada)","Sesiones TLS / reanudación"],
+    devices:"Sin equipo propio: lo resuelve el software de cada extremo",
+    breaks:"Sesión expirada, token de login vencido, WhatsApp Web que pide escanear el QR de nuevo.",
+    tool:"Logs de la aplicación, herramientas de desarrollador del navegador",
+    work:"En TCP/IP casi nunca ves la capa 5 como un encabezado aparte. Vive dentro de la aplicación: cookies, tokens y keep-alive."},
+  4:{n:"Transporte",en:"Transport",pdu:"Segmento (TCP) · Datagrama (UDP)",tcp:"Transporte",
+    lead:"Lleva los datos de un proceso a otro proceso, usando puertos. TCP garantiza entrega ordenada y completa; UDP es más liviano y no garantiza nada.",
+    does:["Multiplexa con números de puerto (443, 53, 1883)","Segmenta y rearma los datos","Control de flujo, de congestión y retransmisión (TCP)"],
+    protos:["TCP","UDP","QUIC","SCTP"],
+    devices:"Firewalls que filtran por puerto, balanceadores de carga de capa 4",
+    breaks:"Puerto bloqueado por firewall, “connection refused” porque nada escucha en ese puerto, timeouts por congestión.",
+    tool:"netstat / ss, telnet o nc a un puerto, Wireshark",
+    work:"Un TCP tiene handshake de 3 pasos (SYN, SYN-ACK, ACK). Si no completa, el servidor ni llegó a ver tu pedido HTTP."},
+  3:{n:"Red",en:"Network",pdu:"Paquete",tcp:"Internet",
+    lead:"Lleva paquetes de una red a otra. Usa direcciones lógicas (IP) y elige el camino a través de routers.",
+    does:["Direccionamiento lógico (IPv4, IPv6)","Enrutamiento entre redes","Fragmentación de paquetes"],
+    protos:["IPv4 · IPv6","ICMP","OSPF","BGP","IPsec"],
+    devices:"Routers, switches de capa 3",
+    breaks:"IP o máscara mal configurada, gateway por defecto equivocado, ruta faltante, IP duplicada.",
+    tool:"ping, traceroute / tracert, ipconfig / ip addr",
+    work:"Si <code>ping 8.8.8.8</code> responde pero <code>ping google.com</code> no, la capa 3 anda bien: el problema es DNS, en capa 7."},
+  2:{n:"Enlace de datos",en:"Data link",pdu:"Trama",tcp:"Acceso a la red",
+    lead:"Mueve tramas entre equipos de la misma red local. Usa direcciones físicas (MAC) y detecta errores con un control al final de la trama.",
+    does:["Direccionamiento físico (MAC)","Armado de tramas y control de errores (FCS)","Control de acceso al medio (CSMA/CD, CSMA/CA)"],
+    protos:["Ethernet 802.3","Wi-Fi 802.11 (MAC)","ARP","VLAN 802.1Q","STP","PPP"],
+    devices:"Switches, bridges, puntos de acceso, placas de red",
+    breaks:"Bucle de switches sin STP, VLAN mal asignada en el puerto, MAC filtrada en el router.",
+    tool:"arp -a, tabla MAC del switch, Wireshark",
+    work:"Se divide en dos subcapas: LLC (arriba) y MAC (abajo). En Wi-Fi la subcapa MAC usa CSMA/CA porque no puede detectar colisiones."},
+  1:{n:"Física",en:"Physical",pdu:"Bits",tcp:"Acceso a la red",
+    lead:"Transmite los bits como señales: pulsos eléctricos en cobre, luz en fibra u ondas de radio. Define conectores, voltajes, frecuencias y velocidades.",
+    does:["Codifica bits en señales","Define medios y conectores (RJ45, LC, SC)","Sincroniza la transmisión y fija la tasa de bits"],
+    protos:["UTP Cat 5e / 6","Fibra monomodo · multimodo","802.11 PHY (2,4 / 5 GHz)","LoRa","DSL","1000BASE-T"],
+    devices:"Cables, hubs, repetidores, transceptores, módems, antenas",
+    breaks:"Cable flojo o cortado, LED de link apagado, interferencia, conector mal crimpado, fibra doblada.",
+    tool:"Tester de cables, LEDs del puerto, analizador de espectro Wi-Fi",
+    work:"Siempre arrancá a diagnosticar desde abajo: si el LED del puerto está apagado, no tiene sentido revisar la API."}
+};
+const PC = {7:"#f6c445",6:"#1fb5a8",5:"#d0479b",4:"#8a4fd0",3:"#2f9e5b",2:"#2f63c8",1:"#ef6a2c"};
+const onCol = k => [5,4,2].includes(k) ? "#ffffff" : "#172036";
+const paint = (el, k) => { el.style.setProperty("--c", `var(--p${k})`); el.style.setProperty("--on", onCol(k)); };
+const INK = "#172036";
+
+/* ---------- Geometría isométrica ---------- */
+const SX = .9, SY = .38, S = 220, T = 14, OX = 235, H = 895, BASE = H - 50 - 181, EXTRA = 40;
+let gap = 100, sel = 7;
+const P = (u, v, z = 0) => [(u - v) * SX, (u + v) * SY + T - z];
+const pts = a => a.map(q => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" ");
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16), c = [n >> 16, n >> 8 & 255, n & 255];
+  const m = x => Math.round(f < 0 ? x * (1 + f) : x + (255 - x) * f);
+  return `rgb(${c.map(m).join(",")})`;
+}
+function box(u, v, w, d, h, z0, fill, topCls = "") {
+  const t = z0 + h, A = P(u, v, t), B = P(u + w, v, t), C = P(u + w, v + d, t), D = P(u, v + d, t);
+  const B0 = P(u + w, v, z0), C0 = P(u + w, v + d, z0), D0 = P(u, v + d, z0);
+  const ol = topCls ? "" : ` stroke="${INK}" stroke-opacity=".55" stroke-width=".8" stroke-linejoin="round"`;
+  return `<polygon points="${pts([D, C, C0, D0])}" fill="${shade(fill, -.2)}"${ol}/><polygon points="${pts([C, B, B0, C0])}" fill="${shade(fill, -.36)}"${ol}/><polygon class="${topCls}" points="${pts([A, B, C, D])}" fill="${fill}"${ol}/>`;
+}
+const flat = (h, inner) => `<g transform="matrix(${SX},${SY},${-SX},${SY},0,${-h})">${inner}</g>`;
+const bb = (u, v, inner) => { const [x, y] = P(u, v, T); return `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})">${inner}</g>`; };
+
+/* ---------- Íconos (parados sobre la placa; origen en el piso) ---------- */
+const st = `stroke="${INK}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"`;
+const I = {
+  tag: (t, c = "#fff") => { const w = 14 + t.length * 7.2; return `<line x1="0" y1="0" x2="0" y2="-6" ${st}/><rect x="${-w/2}" y="-28" width="${w}" height="22" rx="5" fill="${c}" ${st}/><text x="0" y="-13.5" text-anchor="middle" class="tg">${t}</text>`; },
+  browser: t => `<rect x="-27" y="-42" width="54" height="40" rx="4" fill="#fff" ${st}/><path d="M-27 -33 H27" ${st}/><circle cx="-21" cy="-37.5" r="1.8" fill="#ef6a2c"/><circle cx="-15.5" cy="-37.5" r="1.8" fill="#f6c445"/><circle cx="-10" cy="-37.5" r="1.8" fill="#2f9e5b"/><rect x="-21" y="-28" width="17" height="12" rx="2" fill="#cfe1ff"/><path d="M0 -26 H20 M0 -20 H15" stroke="#9aa6bd" stroke-width="2.4" stroke-linecap="round"/><text x="0" y="-6" text-anchor="middle" class="sm">${t}</text>`,
+  cloud: () => `<g transform="scale(1.35)"><path d="M-24 -6 a9 9 0 0 1 3 -17 a13 13 0 0 1 24 -6 a10 10 0 0 1 18 9 a8 8 0 0 1 2 14 Z" fill="#5aa9f5" ${st}/><path d="M-10 -16 L2 -22 L12 -12 M2 -22 L-1 -10 M-10 -16 L-1 -10 L12 -12" stroke="#fff" stroke-width="1.3" fill="none"/><circle cx="-10" cy="-16" r="2.4" fill="#fff"/><circle cx="2" cy="-22" r="2.4" fill="#fff"/><circle cx="12" cy="-12" r="2.4" fill="#fff"/><circle cx="-1" cy="-10" r="2.4" fill="#fff"/></g>`,
+  envelope: () => `<rect x="-21" y="-32" width="42" height="28" rx="3" fill="#fff" ${st}/><path d="M-21 -32 L0 -17 L21 -32" fill="none" ${st}/><text x="0" y="-7" text-anchor="middle" class="sm">SMTP</text>`,
+  lock: () => `<g transform="scale(1.35)"><path d="M-8 -24 V-31 a8 8 0 0 1 16 0 V-24" fill="none" stroke="${INK}" stroke-width="4.5" stroke-linecap="round"/><path d="M-8 -24 V-31 a8 8 0 0 1 16 0 V-24" fill="none" stroke="#c9d3e3" stroke-width="2" stroke-linecap="round"/><rect x="-14" y="-26" width="28" height="23" rx="4" fill="#ffd25e" ${st}/><circle cx="0" cy="-17" r="3" fill="${INK}"/><rect x="-1.3" y="-16" width="2.6" height="7" fill="${INK}"/></g>`,
+  doc: t => `<path d="M-15 -40 H7 L15 -32 V-3 H-15 Z" fill="#fff" ${st}/><path d="M7 -40 V-32 H15" fill="none" ${st}/><path d="M-9 -30 H3 M-9 -24 H9 M-9 -18 H9" stroke="#9aa6bd" stroke-width="2.2" stroke-linecap="round"/><text x="0" y="-7" text-anchor="middle" class="sm">${t}</text>`,
+  image: () => `<rect x="-20" y="-36" width="40" height="32" rx="3" fill="#fff" ${st}/><path d="M-16 -9 L-5 -22 L3 -13 L8 -18 L16 -9 Z" fill="#2f9e5b"/><circle cx="9" cy="-28" r="3.5" fill="#f6c445"/><text x="0" y="-41" text-anchor="middle" class="sm">JPEG</text>`,
+  user: c => `<circle cx="0" cy="-22" r="17" fill="#fff" ${st}/><circle cx="0" cy="-27" r="5.5" fill="${c}"/><path d="M-10 -11 a10 9 0 0 1 20 0 Z" fill="${c}"/>`,
+  session: () => `<g transform="scale(1.25)"><rect x="-28" y="-24" width="56" height="20" rx="10" fill="#fff" ${st}/><path d="M-15 -14 H15" stroke="${INK}" stroke-width="1.4"/><circle cx="-15" cy="-14" r="5" fill="#2f9e5b" ${st}/><circle cx="0" cy="-14" r="5" fill="#2f63c8" ${st}/><circle cx="15" cy="-14" r="5" fill="#ef6a2c" ${st}/><text x="0" y="-29" text-anchor="middle" class="sm">keep-alive</text></g>`,
+  segments: () => [0,1,2,3].map(i => `<g class="hop" style="animation-delay:${i*.18}s"><rect x="${-34+i*17}" y="-26" width="15" height="15" rx="2" fill="${["#f6c445","#fff","#1fb5a8","#fff"][i]}" ${st}/><text x="${-26.5+i*17}" y="-15" text-anchor="middle" class="sm">${i+1}</text></g>`).join("") + `<path d="M-34 -6 H34" stroke="${INK}" stroke-width="1.6" stroke-dasharray="2 3"/>`,
+  check: t => `<circle cx="0" cy="-19" r="14" fill="#2f9e5b" ${st}/><path d="M-6 -19 L-1.5 -14 L7 -24" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/><text x="0" y="-38" text-anchor="middle" class="tg">${t}</text>`,
+  antenna: () => `<path d="M-11 0 L0 -46 L11 0 M-8 -12 H8 M-5 -25 H5 M-8 -12 L5 -25 M8 -12 L-5 -25 M-3 -34 H3" fill="none" ${st}/><circle cx="0" cy="-47" r="3" fill="#fff" ${st}/><g class="wave"><path d="M7 -54 A9 9 0 0 1 7 -40 M-7 -54 A9 9 0 0 0 -7 -40" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></g><g class="wave" style="animation-delay:.4s"><path d="M12 -59 A15 15 0 0 1 12 -35 M-12 -59 A15 15 0 0 0 -12 -35" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></g>`,
+  wifi: () => `<path d="M-12 -14 L-17 -36 M12 -14 L17 -36" ${st}/><circle cx="-17" cy="-37" r="2.5" fill="${INK}"/><circle cx="17" cy="-37" r="2.5" fill="${INK}"/><rect x="-22" y="-15" width="44" height="13" rx="3" fill="#fff" ${st}/><circle cx="-12" cy="-8.5" r="1.8" fill="#2f9e5b"/><circle cx="-6" cy="-8.5" r="1.8" fill="#2f9e5b"/><circle cx="0" cy="-8.5" r="1.8" fill="#f6c445"/><g class="wave"><path d="M-6 -42 a8 8 0 0 1 12 0 M-10 -47 a14 14 0 0 1 20 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></g>`
+};
+
+/* ---------- Escena de cada placa ---------- */
+const S1=[60,190], S2=[130,205], S3=[175,175], S4=[205,140], S5=[190,70];
+const ln = (a, b, c = "#fff", o = .8) => `<path d="M${a[0]} ${a[1]} L${b[0]} ${b[1]}" class="flow" stroke="${c}" stroke-opacity="${o}" stroke-width="2.2" fill="none"/>`;
+function scene(k) {
+  const it = []; let fl = "", sh = "";
+  const add = (p, s) => it.push({d: p[0] + p[1], s});
+  const B = (p, inner, r = 14) => { sh += `<ellipse cx="${p[0]}" cy="${p[1]}" rx="${r}" ry="${r}" fill="#000" opacity=".17"/>`; add(p, bb(p[0], p[1], inner)); };
+  const router = p => add(p, box(p[0]-12, p[1]-12, 24, 24, 10, T, "#eaf2ff") + flat(10, `<path d="M${p[0]-7} ${p[1]} H${p[0]+7} M${p[0]} ${p[1]-7} V${p[1]+7}" stroke="#2f63c8" stroke-width="2.6" stroke-linecap="round"/>`));
+  const sw = p => add(p, box(p[0]-24, p[1]-11, 48, 22, 9, T, "#eef3fb") + flat(9, [0,1,2,3,4,5].map(i => `<rect x="${p[0]-20+i*7}" y="${p[1]-3}" width="5" height="6" fill="${i%2?"#2f9e5b":"#f6c445"}"/>`).join("")));
+  if (k === 7) {
+    fl += [S1,S2,S4,S5].map(p => ln(p, S3, INK, .5)).join("");
+    B(S1, I.browser("HTTP")); B(S2, I.tag("DNS")); B(S3, `<g class="bob">${I.cloud()}</g>`, 24); B(S4, I.tag("MQTT")); B(S5, I.envelope());
+  } else if (k === 6) {
+    fl += `<text x="16" y="203" class="bin">0100 1000 0110</text><text x="203" y="18" transform="rotate(90 203 18)" class="bin">1101 0011</text>` + ln(S1, S3) + ln(S5, S3);
+    B(S1, I.doc("JSON")); B(S2, I.tag("UTF-8")); B(S3, I.lock(), 20); B(S4, I.tag("gzip")); B(S5, I.image());
+  } else if (k === 5) {
+    fl += `<path d="M60 190 Q120 225 175 175 Q225 120 190 70" class="flow" stroke="#fff" stroke-width="2.4" fill="none"/>`;
+    B(S1, I.user("#2f63c8"), 16); B(S5, I.user("#ef6a2c"), 16); B(S3, I.session(), 22); B(S2, I.tag("RPC")); B(S4, I.tag("SIP"));
+  } else if (k === 4) {
+    fl += [0,1,2,3,4].map(i => `<rect x="${18+i*24}" y="150" width="18" height="18" rx="3" fill="${i%2?"#fff":"#f6c445"}" stroke="${INK}" stroke-width="1"/><text x="${27+i*24}" y="162.5" text-anchor="middle" class="sm">${i+1}</text>`).join("") + `<path d="M200 18 V118" class="flow" stroke="#fff" stroke-width="2.4"/>`;
+    B(S3, I.segments(), 22); B(S1, I.doc("SYN")); B(S2, I.tag("UDP")); B(S4, I.check("ACK")); B(S5, I.tag(":443"));
+  } else if (k === 3) {
+    for (let i = 1; i < 5; i++) fl += `<path d="M${i*44} 8 V212 M8 ${i*44} H212" stroke="#fff" stroke-opacity=".14"/>`;
+    fl += `<path d="M24 150 q30 -22 62 -2 t48 22 q-18 32 -60 26 t-50 -46z" fill="#fff" opacity=".16"/><path d="M150 30 q32 -8 52 18 q-4 42 -36 36 q-26 -10 -16 -54z" fill="#fff" opacity=".16"/>`;
+    const R = [[60,180],[150,200],[200,120],[122,124],[194,38]];
+    fl += [[0,1],[1,2],[0,3],[3,2],[2,4],[3,4]].map(([a, b]) => ln(R[a], R[b])).join("");
+    R.forEach(router); B([22,212], I.tag("IPv4")); B([214,178], I.tag("BGP"));
+  } else if (k === 2) {
+    const fr = (u, v) => `<g stroke="${INK}" stroke-width=".8"><rect x="${u}" y="${v}" width="22" height="14" fill="#f6c445"/><rect x="${u+22}" y="${v}" width="46" height="14" fill="#fff"/><rect x="${u+68}" y="${v}" width="14" height="14" fill="#ef6a2c"/></g>`;
+    fl += fr(18, 140) + fr(34, 170) + ln([100,177], [160,180]) + ln([160,180], [195,95]) + ln([195,95], [196,20]);
+    sw([160,180]); sw([195,95]); B([90,210], I.tag("MAC")); B([214,40], I.tag("802.1Q"));
+  } else {
+    fl += `<path d="M10 148 C50 128 80 172 120 158 S172 138 206 162" stroke="#1fb5a8" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M10 148 C50 128 80 172 120 158 S172 138 206 162" class="flow" stroke="#fff" stroke-width="2" fill="none"/>`
+       + `<path d="M10 176 C60 160 90 204 140 190 S186 176 210 196" stroke="#2f63c8" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M10 202 C40 192 80 216 122 210" stroke="#f6c445" stroke-width="6" fill="none" stroke-linecap="round"/>`
+       + `<rect x="118" y="203" width="14" height="12" rx="2" fill="#fff" stroke="${INK}"/><text x="203" y="14" transform="rotate(90 203 14)" class="bin">1011 0010 1110</text>`;
+    B(S5, I.antenna(), 12); B(S4, I.wifi(), 18); B([40,214], I.tag("Cat 6")); B([168,216], I.tag("fibra"));
+  }
+  it.sort((a, b) => a.d - b.d);
+  return flat(0, fl + sh) + it.map(x => x.s).join("");
+}
+
+/* ---------- Armado de la pila ---------- */
+const svg = document.getElementById("stack");
+const detail = document.getElementById("detail");
+let html = "";
+for (let k = 1; k <= 7; k++) {
+  const [rx, ry] = P(S, 0, T);
+  html += `<g class="plate" id="pl-${k}" data-k="${k}" tabindex="0" role="button" aria-label="Capa ${k}: ${L[k].n}"><g class="lift" style="animation-delay:${(7-k)*.08}s">`
+    + box(0, 0, S, S, T, 0, PC[k], "top")
+    + flat(0, `<rect x="9" y="9" width="202" height="202" rx="8" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="1.5"/>`)
+    + scene(k)
+    + `<path d="M${rx+6} ${ry} H${rx+32}" stroke="${PC[k]}" stroke-width="2"/><circle cx="${rx+32}" cy="${ry}" r="3" fill="${PC[k]}"/>`
+    + `<circle cx="${rx+52}" cy="${ry}" r="14" fill="${PC[k]}"/><text x="${rx+52}" y="${ry+5.5}" text-anchor="middle" style="font:800 15px var(--display);fill:${onCol(k)}">${k}</text>`
+    + `<text x="${rx+74}" y="${ry+2}" class="lbl-n">${L[k].n}</text><text x="${rx+74}" y="${ry+19}" class="lbl-s">${L[k].pdu.split(" · ")[0]} · ${L[k].tcp}</text>`
+    + `</g></g>`;
+}
+html += `<g id="pk" aria-hidden="true"><circle r="13" fill="var(--accent)" class="pulse"/><circle r="13" fill="#fff" stroke="${INK}" stroke-width="1.6"/><rect x="-7" y="-5" width="14" height="10" rx="1.5" fill="none" stroke="${INK}" stroke-width="1.5"/><path d="M-7 -5 L0 1 L7 -5" fill="none" stroke="${INK}" stroke-width="1.5"/></g>`;
+svg.innerHTML = html;
+const plates = {}; for (let k = 1; k <= 7; k++) plates[k] = document.getElementById("pl-" + k);
+const yOf = k => BASE - (k - 1) * gap - (k > sel ? EXTRA : 0);
+let pkAt = {layer: 7, mid: false};
+function layout() {
+  for (let k = 1; k <= 7; k++) plates[k].style.transform = `translate(${OX}px,${yOf(k)}px)`;
+  const [x, y] = pkAt.mid ? [OX, BASE + 181 + 26] : [OX - 198 - 18, yOf(pkAt.layer) + 84];
+  document.getElementById("pk").style.transform = `translate(${x}px,${y}px)`;
+}
+for (let k = 1; k <= 7; k++) {
+  const g = plates[k];
+  g.addEventListener("click", () => { select(k); if (window.innerWidth < 900) detail.scrollIntoView({behavior: "smooth", block: "nearest"}); });
+  g.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(k); }
+    if (e.key === "ArrowUp" && k < 7) { e.preventDefault(); select(k + 1, true); }
+    if (e.key === "ArrowDown" && k > 1) { e.preventDefault(); select(k - 1, true); }
+  });
+}
+function select(k, focus) {
+  sel = k;
+  for (let i = 1; i <= 7; i++) plates[i].classList.toggle("sel", i === k);
+  layout();
+  if (focus) plates[k].focus();
+  const x = L[k];
+  paint(detail, k);
+  detail.innerHTML = `
+    <div class="d-head"><span class="big">L${k}</span><div><h2>${x.n}</h2><span class="en">${x.en} layer · PDU: ${x.pdu} · TCP/IP: ${x.tcp}</span></div></div>
+    <div class="d-body">
+      <p class="lead">${x.lead}</p>
+      <div class="row"><h3>Qué hace</h3><ul>${x.does.map(d => `<li>${d}</li>`).join("")}</ul></div>
+      <div class="row"><h3>Protocolos y estándares</h3><div class="chips">${x.protos.map(p => `<span class="chip">${p}</span>`).join("")}</div></div>
+      <div class="cols2">
+        <div class="row"><h3>Equipos</h3><p>${x.devices}</p></div>
+        <div class="row"><h3>Para diagnosticar</h3><p>${x.tool}</p></div>
+      </div>
+      <div class="row"><h3>Cuando falla</h3><p>${x.breaks}</p></div>
+      <p class="note"><b>En la práctica:</b> ${x.work}</p>
+    </div>`;
+  if (window.onSel) window.onSel(k);
+}
+const setView = sep => {
+  gap = sep ? 100 : 34; svg.classList.toggle("compact", !sep);
+  document.getElementById("v-sep").setAttribute("aria-pressed", String(sep));
+  document.getElementById("v-api").setAttribute("aria-pressed", String(!sep)); layout();
+};
+document.getElementById("v-sep").onclick = () => setView(true);
+document.getElementById("v-api").onclick = () => setView(false);
+select(7);
+
+/* ---------- Simulador ---------- */
+const SC = {
+  web:{a:"Make",b:"API de WhatsApp",
+    l7:["HTTP","POST /v21.0/messages"], data:'{"to":"54926...","text":"Hola"}',
+    l6:["TLS 1.3","registro cifrado"], enc:"a7 f3 0c 9e … (HTTP + JSON cifrados)",
+    l5:["Sesión","TLS reanudada · keep-alive"],
+    l4:["TCP",":51544 → :443"], l3:["IPv4","10.0.0.23 → 157.240.0.53"],
+    l2:["Ethernet","MAC 3c:52:… → router"], fcs:"FCS",
+    txt:{
+      7:"Make arma el pedido HTTP: método POST, ruta de la API y el JSON con el mensaje.",
+      6:"TLS cifra todo el pedido HTTP. Desde acá abajo nadie en el camino puede leer el mensaje.",
+      5:"Se reutiliza una sesión TLS ya negociada y la conexión queda abierta (keep-alive). No suma un encabezado propio.",
+      4:"TCP agrega puertos: el de origen es efímero (51544) y el de destino es 443, el de HTTPS.",
+      3:"IP agrega la dirección de origen y la de destino. Los routers solo miran este encabezado.",
+      2:"Ethernet agrega MAC de origen y de destino (la del router, el próximo salto) y un FCS al final para detectar errores.",
+      1:"La placa de red convierte la trama en señales eléctricas sobre el cable UTP."}},
+  iot:{a:"Sensor ESP32",b:"Broker MQTT",
+    l7:["MQTT","PUBLISH vina/lote3/humedad"], data:'{"vwc":23.4,"t":"06:00"}',
+    l6:["TLS 1.2","registro cifrado"], enc:"5d 11 e8 b2 … (MQTT + JSON cifrados)",
+    l5:["Sesión","MQTT CONNECT · keep-alive 60 s"],
+    l4:["TCP",":49152 → :8883"], l3:["IPv4","192.168.4.17 → 52.29.4.10"],
+    l2:["Wi-Fi 802.11","MAC 24:6f:… → AP"], fcs:"FCS",
+    txt:{
+      7:"El sensor de humedad de suelo publica la lectura en el tópico vina/lote3/humedad del broker.",
+      6:"El JSON se cifra con TLS. MQTT seguro usa el puerto 8883; sin cifrar, el 1883.",
+      5:"MQTT mantiene una sesión abierta con el broker y manda un ping cada 60 s para que no se corte.",
+      4:"TCP agrega el puerto de origen y el 8883 de destino, y numera los bytes para poder retransmitir.",
+      3:"IP agrega la dirección privada del sensor y la pública del broker. El router de la finca hace NAT.",
+      2:"La trama Wi-Fi lleva la MAC del sensor y la del punto de acceso, más el FCS.",
+      1:"La radio del ESP32 transmite la trama en 2,4 GHz hasta el punto de acceso."}}
+};
+let sc = "web", step = 0, timer = null;
+const TOTAL = 15; // 0-6 emisor, 7 medio, 8-14 receptor
+
+function segs(low) {
+  const d = SC[sc], s = [];
+  if (low <= 2) s.push({l:2, h:d.l2});
+  if (low <= 3) s.push({l:3, h:d.l3});
+  if (low <= 4) s.push({l:4, h:d.l4});
+  if (low <= 5) s.push({l:5, h:d.l5, ghost:true});
+  if (low <= 6) { s.push({l:6, h:d.l6}); s.push({l:6, h:["Datos", d.enc], data:true}); }
+  else { s.push({l:7, h:d.l7}); s.push({l:7, h:["Datos", d.data], data:true}); }
+  if (low <= 2) s.push({l:2, h:[d.fcs, "control de errores"]});
+  return s;
+}
+function bitsStr() {
+  let o = ""; for (let i = 0; i < 160; i++) o += (Math.sin(i * 12.9898 + step) * 43758.5453 % 1 + 1) % 1 > .5 ? "1" : "0";
+  return o.replace(/(.{8})/g, "$1 ");
+}
+function renderSim() {
+  const d = SC[sc];
+  document.getElementById("h-a-n").textContent = d.a;
+  document.getElementById("h-b-n").textContent = d.b;
+  let layer, side, title, body, removing = false;
+  if (step <= 6) { layer = 7 - step; side = "a"; title = `Emisor · capa ${layer}, ${L[layer].n}`; body = d.txt[layer]; }
+  else if (step === 7) { layer = 1; side = "mid"; title = "En el medio"; body = "Los bits viajan por cables, switches y routers. Cada router lee hasta la capa 3, arma una trama nueva con otras MAC y la reenvía. Las capas 4 a 7 llegan intactas."; }
+  else { layer = step - 7; side = "b"; removing = true; title = `Receptor · capa ${layer}, ${L[layer].n}`;
+    body = layer === 1 ? "La placa de red del destino recibe las señales y las vuelve a convertir en bits."
+      : layer === 7 ? `Queda el mensaje original y llega a la aplicación: ${d.b} lo procesa.`
+      : `La capa ${layer} lee su encabezado, verifica lo que le toca y lo saca antes de pasar el resto hacia arriba.`; }
+  const low = step === 7 ? 1 : layer;
+  document.getElementById("pkt").innerHTML = segs(low).map(s => {
+    const hot = s.l === layer && step !== 7 && layer !== 1;
+    return `<div class="seg${s.data ? " data" : ""}${s.ghost ? " ghost" : ""}${hot ? " hot" : ""}${hot && removing && layer !== 7 ? " leaving" : ""}" style="--c:var(--p${s.l})"><span class="t">L${s.l} · ${s.h[0]}</span><span class="v">${s.h[1]}</span></div>`;
+  }).join("");
+  const bits = document.getElementById("bits");
+  bits.hidden = layer !== 1; if (layer === 1) bits.textContent = bitsStr();
+  const stp = document.getElementById("step");
+  paint(stp, layer);
+  stp.innerHTML = `<span class="k">${step === 7 ? "↔" : "L" + layer}</span><b>${title}</b><p>${body}</p>`;
+  const dot = document.getElementById("dot");
+  dot.style.left = side === "a" ? "0%" : side === "b" ? "100%" : "50%"; dot.style.setProperty("--c", `var(--p${layer})`);
+  document.getElementById("h-a").classList.toggle("on", side === "a");
+  document.getElementById("h-b").classList.toggle("on", side === "b");
+  for (let i = 1; i <= 7; i++) plates[i].classList.toggle("sim", i === layer && step !== 7);
+  pkAt = {layer, mid: step === 7}; layout();
+  document.getElementById("prog").textContent = `paso ${step + 1} de ${TOTAL}`;
+  document.getElementById("prev").disabled = step === 0;
+  document.getElementById("next").disabled = step === TOTAL - 1;
+}
+function stopPlay() { clearInterval(timer); timer = null; document.getElementById("play").textContent = "Reproducir"; }
+document.getElementById("prev").onclick = () => { stopPlay(); if (step > 0) { step--; renderSim(); } };
+document.getElementById("next").onclick = () => { stopPlay(); if (step < TOTAL - 1) { step++; renderSim(); } };
+document.getElementById("reset").onclick = () => { stopPlay(); step = 0; renderSim(); };
+document.getElementById("play").onclick = () => {
+  if (timer) return stopPlay();
+  if (step === TOTAL - 1) step = 0;
+  document.getElementById("play").textContent = "Pausar"; renderSim();
+  timer = setInterval(() => { if (step >= TOTAL - 1) return stopPlay(); step++; renderSim(); }, 2200);
+};
+for (const k of ["web", "iot"]) document.getElementById("sc-" + k).onclick = () => {
+  sc = k; document.getElementById("sc-web").setAttribute("aria-pressed", String(k === "web"));
+  document.getElementById("sc-iot").setAttribute("aria-pressed", String(k === "iot")); renderSim();
+};
+renderSim();
+
+/* ---------- Práctica ---------- */
+const Q = [
+  ["HTTP",7,"Define pedidos y respuestas entre aplicaciones."],["DNS",7,"Traduce nombres a direcciones IP; es un servicio para las aplicaciones."],
+  ["MQTT",7,"Protocolo de mensajería de aplicación, muy usado en IoT."],["SMTP",7,"Protocolo de envío de mail."],
+  ["TLS",6,"Se enseña en capa 6 porque cifra. En la práctica corre entre TCP y la aplicación, así que también lo vas a ver ubicado en la 5 o en la 4."],
+  ["JPEG",6,"Es un formato de representación de los datos."],["UTF-8",6,"Codificación de caracteres: traducir el formato es tarea de la capa 6."],
+  ["RPC",5,"Gestiona el diálogo de llamadas remotas entre procesos."],["NetBIOS",5,"Servicio de sesión de las redes Windows clásicas."],
+  ["TCP",4,"Transporte confiable de proceso a proceso."],["UDP",4,"Transporte sin conexión ni garantía de entrega."],
+  ["Número de puerto",4,"Los puertos identifican procesos: es direccionamiento de capa 4."],
+  ["IP",3,"Direccionamiento lógico y enrutamiento."],["ICMP (ping)",3,"Viaja dentro de IP y reporta errores de red."],
+  ["Router",3,"Decide hacia dónde enviar según la IP de destino."],["Dirección IP",3,"Dirección lógica de la capa de red."],
+  ["Switch",2,"Reenvía tramas según la MAC. Los switches de capa 3 también enrutan."],["Dirección MAC",2,"Dirección física grabada en la placa de red."],
+  ["ARP",2,"Discutido: resuelve IP (capa 3) a MAC (capa 2). No viaja dentro de IP, por eso suele ubicarse en la 2."],
+  ["VLAN 802.1Q",2,"Etiqueta las tramas Ethernet para separar redes lógicas."],["Access point",2,"Puentea tramas entre Wi-Fi y Ethernet."],
+  ["Cable UTP Cat 6",1,"Es el medio físico."],["Hub",1,"Repite señales a todos los puertos sin mirar direcciones."],
+  ["Fibra óptica",1,"Medio físico que transmite luz."],["Repetidor",1,"Regenera la señal sin interpretarla."],["Radio LoRa",1,"Modulación de radio. LoRaWAN, el protocolo que corre encima, ya es capa 2 en adelante."]
+];
+let qi = -1, answered = false, right = 0, total = 0, order = [];
+function shuffle() { order = Q.map((_, i) => i).sort(() => Math.random() - .5); }
+const qopts = document.getElementById("qopts");
+for (let k = 7; k >= 1; k--) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "qopt"; b.dataset.k = k;
+  paint(b, k); b.innerHTML = `${k}<small>${L[k].n}</small>`;
+  b.onclick = () => answer(k); qopts.appendChild(b);
+}
+function nextQ() {
+  if (!order.length) shuffle();
+  qi = order.pop(); answered = false;
+  document.getElementById("q-item").textContent = Q[qi][0];
+  document.getElementById("q-fb").className = "q-fb"; document.getElementById("q-fb").textContent = "";
+  qopts.querySelectorAll(".qopt").forEach(b => b.classList.remove("right", "wrong"));
+}
+function answer(k) {
+  if (answered) return; answered = true; total++;
+  const [, ok, why] = Q[qi], fb = document.getElementById("q-fb");
+  if (k === ok) right++;
+  qopts.querySelectorAll(".qopt").forEach(b => b.classList.add(+b.dataset.k === ok ? "right" : "wrong"));
+  fb.className = "q-fb " + (k === ok ? "ok" : "no");
+  fb.innerHTML = `<b>${k === ok ? "Correcto." : `No, es la capa ${ok}.`}</b> ${why}`;
+  document.getElementById("score").textContent = `${right} de ${total}`;
+  select(ok);
+}
+document.getElementById("q-next").onclick = nextQ;
+nextQ();
+
+/* ---------- Laboratorio binario ---------- */
+const enc = new TextEncoder();
+const Bn = {text:"Hola", key:90, mqtt:0x02, port:443, flags:0x02, ip:"192.168.4.17", cidr:24, mac:"3C:52:82:1A:7F:09", noise:false, l1:null};
+const txt = () => Bn.text || "Hola";
+const data = () => Array.from(enc.encode(txt()));
+const bn = (n, w = 8) => n.toString(2).padStart(w, "0");
+const hx = (n, w = 2) => n.toString(16).toUpperCase().padStart(w, "0");
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = n => n.toLocaleString("es-AR");
+function bv(str, cls = () => "") {
+  let o = "";
+  for (let i = 0; i < str.length; i += 8) {
+    o += '<span class="byte">';
+    for (let j = i; j < Math.min(i + 8, str.length); j++) o += `<i class="${str[j] === "1" ? "b1" : "b0"} ${cls(j)}${j - i === 3 ? " nib" : ""}">${str[j]}</i>`;
+    o += "</span>";
+  }
+  return `<span class="bits-v">${o}</span>`;
+}
+const dotted = n => [24, 16, 8, 0].map(s => (n >>> s) & 255).join(".");
+const CRC_T = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = a => { let c = 0xFFFFFFFF; for (const b of a) c = CRC_T[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+const l1byte = () => Bn.l1 ?? data()[0];
+const quote = () => `“${esc(txt())}”`;
+const PORTS = {20:"FTP datos",21:"FTP",22:"SSH",25:"SMTP",53:"DNS",80:"HTTP",123:"NTP",443:"HTTPS",1883:"MQTT",3306:"MySQL",5432:"PostgreSQL",5678:"n8n",8080:"HTTP alternativo",8883:"MQTT sobre TLS"};
+const FLAGS = ["CWR","ECE","URG","ACK","PSH","RST","SYN","FIN"];
+const PRESETS = [["SYN",0x02,"Paso 1 del handshake: el cliente pide abrir la conexión."],["SYN-ACK",0x12,"Paso 2: el servidor acepta y confirma."],["ACK",0x10,"Paso 3: el cliente confirma. La conexión queda abierta."],["PSH-ACK",0x18,"Envío de datos: “entregalos ya a la aplicación”."],["FIN-ACK",0x11,"Cierre ordenado: “terminé de mandar”."],["RST",0x04,"Corte abrupto: puerto cerrado o conexión rechazada."]];
+
+const LABS = {
+  7:{t:"Del texto a los bytes",
+    intro:"La aplicación entrega texto. Para la red eso es una secuencia de bytes: cada carácter se codifica en UTF-8 y cada byte son 8 bits. Probá con una tilde o una ñ: ocupan 2 bytes.",
+    html:() => `<label class="fld" for="b-text">Mensaje <input id="b-text" maxlength="14" value="${esc(Bn.text)}" autocomplete="off" spellcheck="false"></label>`,
+    out:() => {
+      const rows = [...txt()].map(ch => { const e = [...enc.encode(ch)];
+        return `<tr><td class="ch">${ch === " " ? "␣" : esc(ch)}</td><td class="num">U+${hx(ch.codePointAt(0), 4)}</td><td class="num">${e.map(x => hx(x)).join(" ")}</td><td>${e.map(x => bv(bn(x))).join(" ")}</td></tr>`; }).join("");
+      const n = data().length;
+      return `<div class="tbl"><table><thead><tr><th>Carácter</th><th>Unicode</th><th>UTF-8 (hex)</th><th>Bits</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="callout">${[...txt()].length} caracteres → <b>${n} bytes</b> → <b>${n * 8} bits</b>. Un dígito hexadecimal equivale a 4 bits, por eso cada byte se escribe con 2 (0x${hx(data()[0])} = ${bv(bn(data()[0]))}).</p>`;
+    }},
+  6:{t:"Codificar y cifrar",
+    intro:`La capa 6 transforma los bytes sin cambiar su significado. Acá ves dos transformaciones sobre ${quote()}: Base64, que reagrupa los bits de a 6, y un cifrado XOR con una clave de 1 byte.`,
+    html:() => `<label class="fld" for="b-key">Clave de 1 byte <input type="range" id="b-key" min="0" max="255" value="${Bn.key}"></label>`,
+    out:() => {
+      const d = data().slice(0, 6), bits = d.map(x => bn(x)).join("");
+      const b64 = btoa(String.fromCharCode(...d)).replace(/=+$/, "");
+      const g = [...b64].map((ch, i) => { const s = bits.slice(i * 6, i * 6 + 6).padEnd(6, "0"); return `<div class="g6"><span>${s}</span><small>${parseInt(s, 2)}</small><b>${ch}</b></div>`; }).join("");
+      const k = Bn.key, x4 = d.slice(0, 4);
+      const rows = x4.map(x => `<tr><td class="num">0x${hx(x)}</td><td>${bv(bn(x))}</td><td>${bv(bn(k), j => (k >> (7 - j)) & 1 ? "hl" : "")}</td><td>${bv(bn(x ^ k), j => (k >> (7 - j)) & 1 ? "hl" : "")}</td><td class="num">0x${hx(x ^ k)}</td></tr>`).join("");
+      return `<div class="line"><span class="lk">Base64</span>${bits.length / 8} bytes = ${bits.length} bits, en grupos de 6 → cada grupo es un número de 0 a 63 → un carácter</div>
+        <div class="g6wrap">${g}</div>
+        <div class="line"><span class="lk">Clave</span><b class="num">${k}</b> = 0x${hx(k)} = ${bv(bn(k))}</div>
+        <div class="tbl"><table><thead><tr><th>Byte</th><th>Dato</th><th>⊕ Clave</th><th>= Cifrado</th><th>Hex</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="callout">XOR da 1 cuando los bits son distintos: donde la clave tiene un 1, el bit del dato se invierte (marcados). El receptor aplica XOR con la misma clave y recupera 0x${hx(x4[0])}, porque (dato ⊕ clave) ⊕ clave = dato. TLS real usa AES o ChaCha20, mucho más complejos, pero los cifrados de flujo combinan los datos con este mismo XOR bit a bit.</p>`;
+    }},
+  5:{t:"Bits que controlan la sesión",
+    intro:"Al abrir la sesión con el broker, MQTT 3.1.1 manda un byte de “Connect Flags”. Cada bit es un interruptor. Técnicamente es un protocolo de aplicación, pero estos bits deciden si la sesión se retoma o arranca de cero. Tocá los bits.",
+    out:() => {
+      const m = Bn.mqtt, b = i => (m >> i) & 1, q = (m >> 3) & 3;
+      const def = [[7,"User Name"],[6,"Password"],[5,"Will Retain"],[4,"Will QoS alto"],[3,"Will QoS bajo"],[2,"Will Flag"],[1,"Clean Session"],[0,"Reservado"]];
+      const errs = [];
+      if (!b(2) && (q || b(5))) errs.push("Con Will Flag en 0, Will QoS y Will Retain tienen que ir en 0.");
+      if (q === 3) errs.push("Will QoS = 3 (11) no existe: solo hay QoS 0, 1 y 2.");
+      if (b(6) && !b(7)) errs.push("En MQTT 3.1.1 no se puede mandar Password sin User Name.");
+      return `<div class="toggles">${def.map(([i, l]) => `<button type="button" class="tbit" data-bit="${i}" aria-pressed="${!!b(i)}"${i === 0 ? " disabled" : ""}><b>${b(i)}</b><small>${l}</small></button>`).join("")}</div>
+        <div class="line"><span class="lk">Byte de flags</span>${bv(bn(m), j => (m >> (7 - j)) & 1 ? "hl" : "")}<span class="num">= 0x${hx(m)} = ${m}</span></div>
+        <div class="line"><span class="lk">Keep-alive</span>60 s en 16 bits: ${bv(bn(60, 16))}</div>
+        <p class="callout">${b(1) ? "<b>Clean Session = 1:</b> el broker descarta la sesión anterior. El sensor arranca sin suscripciones ni mensajes pendientes." : "<b>Clean Session = 0:</b> sesión persistente. El broker guarda las suscripciones y los mensajes QoS 1 y 2 que lleguen mientras el sensor está desconectado."}
+        ${errs.length ? `<br><span class="no-t">El broker rechazaría esta conexión.</span> ${errs.join(" ")}` : `<br><span class="ok-t">Combinación válida.</span>`}</p>`;
+    }},
+  4:{t:"Puertos y banderas TCP",
+    intro:"El encabezado TCP guarda el puerto en 16 bits (de 0 a 65.535) y el tipo de segmento en un byte de banderas, donde cada bit tiene un significado propio.",
+    html:() => `<label class="fld" for="b-port">Puerto de destino <input id="b-port" type="number" min="0" max="65535" value="${Bn.port}"></label>`,
+    out:() => {
+      const p = Bn.port, f = Bn.flags, pr = PRESETS.find(x => x[1] === f);
+      const range = p < 1024 ? "bien conocido (0 a 1.023)" : p < 49152 ? "registrado (1.024 a 49.151)" : "efímero (49.152 a 65.535), típico del lado cliente";
+      return `<div class="line"><span class="lk">Puerto ${fmt(p)}</span>${bv(bn(p, 16))}<span class="num">= 0x${hx(p, 4)}</span></div>
+        <p class="callout">${PORTS[p] ? `<b>${PORTS[p]}</b>. ` : ""}Rango ${range}. Viaja como 2 bytes: 0x${hx(p >> 8)} y 0x${hx(p & 255)}, el más significativo primero (orden de red, big-endian).</p>
+        <div class="presets"><span class="lk">Banderas</span>${PRESETS.map(([n, v]) => `<button type="button" class="btn sm" data-preset="${v}">${n}</button>`).join("")}</div>
+        <div class="toggles">${FLAGS.map((n, i) => { const bit = 7 - i; return `<button type="button" class="tbit" data-flag="${bit}" aria-pressed="${!!((f >> bit) & 1)}"><b>${(f >> bit) & 1}</b><small>${n}</small></button>`; }).join("")}</div>
+        <div class="line"><span class="lk">Byte de banderas</span>${bv(bn(f), j => (f >> (7 - j)) & 1 ? "hl" : "")}<span class="num">= 0x${hx(f)} = ${f}</span></div>
+        <p class="callout">${pr ? `<b>${pr[0]}.</b> ${pr[2]}` : "Combinación personalizada. Wireshark la mostraría por los nombres de los bits que valen 1."}</p>`;
+    }},
+  3:{t:"IP, máscara y operación AND",
+    intro:"Una IPv4 son 32 bits. La máscara marca con 1 los bits de red y con 0 los de host. Un AND bit a bit entre la IP y la máscara da la dirección de red: así decide un router si el destino está en su red o tiene que reenviarlo.",
+    html:() => `<div class="fld"><label for="b-ip">IP</label><input id="b-ip" value="${esc(Bn.ip)}" autocomplete="off" spellcheck="false"><label for="b-cidr">Prefijo</label><input type="range" id="b-cidr" min="8" max="30" value="${Bn.cidr}"></div>`,
+    out:() => {
+      const m = Bn.ip.trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (!m || m.slice(1).some(o => +o > 255)) return `<p class="callout no-t">Escribí una IPv4 con 4 números de 0 a 255 separados por puntos, por ejemplo 192.168.4.17.</p>`;
+      const ip = m.slice(1).reduce((a, o) => a * 256 + +o, 0), c = Bn.cidr;
+      const mask = (0xFFFFFFFF << (32 - c)) >>> 0, net = (ip & mask) >>> 0, bc = (net | (~mask >>> 0)) >>> 0;
+      const cl = j => j < c ? "hl" : "";
+      const row = (l, n, f = cl) => `<tr><th>${l}</th><td>${bv(bn(n, 32), f)}</td><td class="num">${dotted(n)}</td></tr>`;
+      return `<div class="tbl"><table><tbody>${row("IP", ip)}${row(`Máscara /${c}`, mask)}${row("AND → Red", net)}${row("Broadcast", bc, j => j < c ? "hl" : "")}</tbody></table></div>
+        <div class="line"><span class="lk">Resultado</span>Red <b class="num">${dotted(net)}/${c}</b> · hosts de ${dotted(net + 1)} a ${dotted(bc - 1)} · <b>${fmt(2 ** (32 - c) - 2)}</b> direcciones usables (2^${32 - c} − 2)</div>
+        <p class="callout">Marcados: los ${c} bits de red. AND da 1 solo si los dos bits valen 1, así que los bits de host quedan en 0 y aparece la dirección de red. El broadcast pone todos los bits de host en 1.<br><br><b>TTL:</b> el paquete sale con 64 = ${bv(bn(64))}. Cada router le resta 1: queda 63 = ${bv(bn(63))}. Si llega a 0 se descarta y vuelve un ICMP “Time Exceeded”. Así funciona traceroute.</p>`;
+    }},
+  2:{t:"Direcciones MAC y control de errores",
+    intro:"La MAC son 48 bits: los primeros 24 identifican al fabricante (OUI). Al final de la trama va el FCS, un CRC-32 calculado sobre los datos para detectar bits dañados en el camino.",
+    html:() => `<label class="fld" for="b-mac">MAC <input id="b-mac" value="${esc(Bn.mac)}" autocomplete="off" spellcheck="false"></label>`,
+    out:() => {
+      const parts = Bn.mac.trim().split(/[:\-]/);
+      let macHtml;
+      if (parts.length !== 6 || parts.some(h => !/^[0-9a-fA-F]{2}$/.test(h))) macHtml = `<p class="callout no-t">Escribí 6 pares hexadecimales separados por “:”, por ejemplo 3C:52:82:1A:7F:09.</p>`;
+      else {
+        const b = parts.map(h => parseInt(h, 16)), ig = b[0] & 1, ul = (b[0] >> 1) & 1;
+        macHtml = `<div class="macs">${b.map((x, i) => `<div class="macb${i < 3 ? " oui" : ""}"><b>${hx(x)}</b>${bv(bn(x), j => i === 0 && j >= 6 ? "hl" : "")}<small>${i < 3 ? "Fabricante (OUI)" : "Placa"}</small></div>`).join("")}</div>
+          <p class="callout">Los 2 bits marcados del primer byte: <b>I/G = ${ig}</b> → ${ig ? "multicast o broadcast (a un grupo)" : "unicast (a un solo equipo)"} · <b>U/L = ${ul}</b> → ${ul ? "administrada localmente (por ejemplo, MAC aleatoria del celular)" : "global, grabada de fábrica"}. Ethernet transmite cada byte empezando por el bit menos significativo, así que el I/G es el primer bit que sale al cable. Broadcast: FF:FF:FF:FF:FF:FF, los 48 bits en 1.</p>`;
+      }
+      const d = data(), fcs = crc32(d), rx = d.slice(); if (Bn.noise) rx[0] ^= 1;
+      const fr = crc32(rx);
+      return `${macHtml}
+        <div class="line"><span class="lk">FCS de ${quote()}</span><span class="num">0x${hx(fcs, 8)}</span>${bv(bn(fcs, 32))}</div>
+        <div class="presets"><button type="button" class="btn sm" data-noise="1">${Bn.noise ? "Sacar el ruido" : "Simular ruido: invertir 1 bit"}</button></div>
+        ${Bn.noise ? `<div class="line"><span class="lk">Primer byte</span>enviado ${bv(bn(d[0]))} recibido ${bv(bn(rx[0]), j => j === 7 ? "flip" : "")}</div>
+          <p class="callout">El receptor recalcula y obtiene <span class="num">0x${hx(fr, 8)}</span>, distinto del FCS recibido <span class="num">0x${hx(fcs, 8)}</span>. <span class="no-t">Trama descartada.</span> Ethernet no la corrige: si hace falta, TCP la retransmite más arriba.</p>`
+        : `<p class="callout">El receptor recalcula el CRC sobre lo que recibió. Coincide con el FCS: <span class="ok-t">trama aceptada.</span> Un solo bit cambiado altera el CRC por completo.</p>`}`;
+    }},
+  1:{t:"De bits a señal",
+    intro:"La capa física convierte cada bit en un estado de la señal. Acá ves el primer byte del mensaje en dos codificaciones de línea. Tocá los bits para cambiarlos.",
+    out:() => {
+      const v = l1byte(), s = bn(v), w = 44, x0 = 96, hi1 = 24, lo1 = 54, hi2 = 88, lo2 = 118;
+      let nrz = `M${x0} ${s[0] === "1" ? hi1 : lo1}`, man = `M${x0} ${s[0] === "1" ? lo2 : hi2}`, grid = "", lab = "";
+      [...s].forEach((b, i) => {
+        const x = x0 + i * w;
+        nrz += ` V${b === "1" ? hi1 : lo1} H${x + w}`;
+        const a = b === "1" ? lo2 : hi2, z = b === "1" ? hi2 : lo2;
+        man += ` V${a} H${x + w / 2} V${z} H${x + w}`;
+        grid += `<line x1="${x}" y1="16" x2="${x}" y2="126" stroke="var(--line)" stroke-dasharray="3 3"/>`;
+        lab += `<text x="${x + w / 2}" y="12" text-anchor="middle" class="wb">${b}</text>`;
+      });
+      grid += `<line x1="${x0 + 8 * w}" y1="16" x2="${x0 + 8 * w}" y2="126" stroke="var(--line)" stroke-dasharray="3 3"/>`;
+      const src = Bn.l1 == null ? `primer byte de ${quote()} = 0x${hx(v)}` : `byte editado = 0x${hx(v)}`;
+      return `<div class="toggles">${[...s].map((b, i) => `<button type="button" class="tbit" data-l1="${7 - i}" aria-pressed="${b === "1"}"><b>${b}</b><small>bit ${7 - i}</small></button>`).join("")}</div>
+        <div class="line"><span class="lk">Byte</span>${src} = ${v}${Bn.l1 != null ? ` <button type="button" class="btn sm" data-l1reset="1">Volver al mensaje</button>` : ""}</div>
+        <div class="sigbox"><svg viewBox="0 0 ${x0 + 8 * w + 8} 134" role="img" aria-label="Señal NRZ-L y Manchester del byte ${s}">
+          ${grid}${lab}
+          <text x="0" y="${(hi1 + lo1) / 2 + 4}" class="wl">NRZ-L</text><text x="0" y="${(hi2 + lo2) / 2 + 4}" class="wl">Manchester</text>
+          <path d="${nrz}" fill="none" stroke="var(--p1)" stroke-width="2.6" stroke-linejoin="round"/>
+          <path d="${man}" fill="none" stroke="var(--p2)" stroke-width="2.6" stroke-linejoin="round"/>
+        </svg></div>
+        <p class="callout"><b>NRZ-L:</b> 1 es nivel alto y 0 nivel bajo. Con muchos bits iguales seguidos la señal no cambia y el receptor puede perder la sincronía.<br><b>Manchester</b> (10BASE-T, IEEE 802.3): 1 sube a mitad del bit y 0 baja. Siempre hay una transición al medio, que el receptor usa como reloj. El costo es el doble de ancho de banda. Gigabit sobre cobre usa PAM-5, y la fibra usa pulsos de luz.</p>`;
+    }}
+};
+
+const labEl = document.getElementById("lab"), labMain = document.getElementById("lab-main"), ltabs = document.getElementById("ltabs");
+let labCur = null;
+for (let k = 7; k >= 1; k--) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "ltab"; b.dataset.k = k; paint(b, k);
+  b.innerHTML = `${k}<small>${L[k].n}</small>`; b.onclick = () => select(k); ltabs.appendChild(b);
+}
+function showLab(k) {
+  if (k === labCur) return;
+  labCur = k; paint(labEl, k);
+  ltabs.querySelectorAll(".ltab").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.k === k)));
+  const X = LABS[k];
+  labMain.innerHTML = `<h3>L${k} · ${X.t}</h3><p class="intro">${X.intro}</p>${X.html ? X.html() : ""}<div class="res-wrap" id="lab-out"></div>`;
+  updateLab();
+}
+function updateLab() {
+  document.getElementById("lab-out").innerHTML = LABS[labCur].out();
+  if (labCur === 6) labMain.querySelector(".intro").innerHTML = LABS[6].intro.replace(/“.*?”/, quote());
+  const n = data().length, W = [[7,n,"datos"],[6,n+21,"+21 TLS (5 de registro + 16 de autenticación)"],[5,n+21,"+0, no agrega encabezado"],[4,n+41,"+20 TCP"],[3,n+61,"+20 IPv4"],[2,n+79,"+18 Ethernet (14 + 4 de FCS)"],[1,n+99,"+20 preámbulo y separación entre tramas"]];
+  document.getElementById("lab-w").innerHTML = W.map(([k, b, note]) => `<div class="wrow${k === labCur ? " cur" : ""}" style="--c:var(--p${k});--on:${onCol(k)}"><span class="n">${k}</span><div class="wbar" style="width:${(b / (n + 99) * 100).toFixed(1)}%"></div><span class="meta">${b} bytes · ${fmt(b * 8)} bits · ${note}</span></div>`).join("")
+    + `<p class="callout">De ${n + 99} bytes que salen al cable, ${n} son ${quote()}: <b>${(n / (n + 99) * 100).toFixed(1).replace(".", ",")} %</b>. Los mensajes cortos pagan mucho encabezado. Sin contar el encabezado HTTP.</p>`;
+}
+labMain.addEventListener("input", e => {
+  const t = e.target, v = t.value;
+  if (t.id === "b-text") { Bn.text = v; Bn.l1 = null; }
+  else if (t.id === "b-key") Bn.key = +v;
+  else if (t.id === "b-port") { const p = parseInt(v, 10); if (isNaN(p)) return; Bn.port = Math.min(65535, Math.max(0, p)); }
+  else if (t.id === "b-ip") Bn.ip = v;
+  else if (t.id === "b-cidr") Bn.cidr = +v;
+  else if (t.id === "b-mac") Bn.mac = v;
+  else return;
+  updateLab();
+});
+labMain.addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t || t.disabled) return;
+  const ds = t.dataset; let key;
+  if (ds.bit != null) { Bn.mqtt ^= 1 << +ds.bit; key = `[data-bit="${ds.bit}"]`; }
+  else if (ds.flag != null) { Bn.flags ^= 1 << +ds.flag; key = `[data-flag="${ds.flag}"]`; }
+  else if (ds.preset != null) { Bn.flags = +ds.preset; key = `[data-preset="${ds.preset}"]`; }
+  else if (ds.noise != null) { Bn.noise = !Bn.noise; key = "[data-noise]"; }
+  else if (ds.l1 != null) { Bn.l1 = l1byte() ^ (1 << +ds.l1); key = `[data-l1="${ds.l1}"]`; }
+  else if (ds.l1reset != null) { Bn.l1 = null; key = '[data-l1="7"]'; }
+  else return;
+  updateLab();
+  labMain.querySelector(key)?.focus();
+});
+window.onSel = showLab;
+showLab(sel);
+</script>
+
+</body>
+</html>
