@@ -1,0 +1,718 @@
+<style>
+  /* Layout: un escenario fijo de 1080×1350 (4:5) que se escala al ancho disponible; debajo, la franja de turno/dato y los controles. */
+  :root {
+    --suelo: #0c0a09;      /* stone-950, el fondo de la app */
+    --piedra: #1c1917;
+    --piedra-2: #292524;
+    --borde: #44403c;
+    --tinta: #fafaf9;
+    --tinta-2: #a8a29e;
+    --tinta-3: #78716c;
+    --hoja: #22c55e;       /* verde del ícono */
+    --hoja-2: #4ade80;
+    --bosque: #15803d;     /* botón primario de la app */
+    --tronco: #a9754a;
+    --alto: #ea580c;
+    --critico: #dc2626;
+    --f-titulo: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+    --f-texto: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-dato: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--suelo); color: var(--tinta); font-family: var(--f-texto); }
+
+  /* ───────── Escenario ───────── */
+  #root { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--suelo); font-family: var(--f-texto); color: var(--tinta); transform-origin: 0 0; }
+  :where(#root) :is(p, h1, h2, h3, ol, ul) { margin: 0; padding: 0; }
+  :where(#root) :is(ol, ul) { list-style: none; }
+  :where(#root) button { font: inherit; color: inherit; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+  .fondo { position: absolute; inset: 0; background:
+      radial-gradient(900px 700px at 85% 0%, rgb(34 197 94 / .10), transparent 70%),
+      radial-gradient(700px 600px at 0% 100%, rgb(169 117 74 / .10), transparent 70%); }
+  .fondo::after { content: ""; position: absolute; inset: 0; opacity: .05;
+      background-image: linear-gradient(var(--tinta) 1px, transparent 1px), linear-gradient(90deg, var(--tinta) 1px, transparent 1px); background-size: 90px 90px; }
+  .clip { position: absolute; inset: 0; pointer-events: none; }
+  .capa { position: absolute; inset: 0; visibility: hidden; opacity: 0; pointer-events: auto; }
+  .ceja { position: absolute; left: 72px; top: 92px; font: 700 24px/1 var(--f-dato); letter-spacing: .14em; text-transform: uppercase; color: var(--hoja); }
+  .titulo { position: absolute; left: 72px; right: 72px; top: 140px; font: 700 76px/1.02 var(--f-titulo); letter-spacing: -.025em; text-wrap: balance; }
+  .titulo em { font-style: normal; color: var(--hoja); }
+  .w { display: inline-block; }
+  .ejemplo { font: 700 18px/1 var(--f-dato); letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-2); border: 1.5px dashed var(--borde); border-radius: 999px; padding: 9px 14px; display: inline-block; }
+  .punto { width: 16px; height: 16px; border-radius: 50%; flex: none; display: inline-block; }
+
+  /* 1 · Portada */
+  #s1 .silueta { position: absolute; right: -90px; top: 60px; width: 760px; opacity: .5; }
+  #s1 .silueta path { fill: none; stroke: var(--hoja); stroke-width: 1.2; stroke-opacity: .55; }
+  #s1 .marca { position: absolute; left: 72px; top: 330px; display: flex; align-items: center; gap: 22px; font: 700 40px/1 var(--f-titulo); letter-spacing: -.01em; }
+  .icono { width: 92px; height: 92px; border-radius: 24px; background: #14261a; flex: none; }
+  #s1 h1 { position: absolute; left: 72px; right: 60px; top: 500px; font: 800 124px/.96 var(--f-titulo); letter-spacing: -.035em; }
+  #s1 h1 em { font-style: normal; color: var(--hoja); }
+  #s1 .bajada { position: absolute; left: 72px; top: 1010px; width: 760px; font: 500 36px/1.35 var(--f-texto); color: var(--tinta-2); }
+  #s1 .coord { position: absolute; left: 72px; top: 1190px; font: 500 22px/1 var(--f-dato); color: var(--tinta-3); letter-spacing: .06em; }
+
+  /* 2 · Problema */
+  #s2 .casos { position: absolute; left: 72px; right: 72px; top: 250px; display: grid; gap: 44px; }
+  #s2 .casos li { display: flex; align-items: center; gap: 28px; font: 600 62px/1.08 var(--f-titulo); letter-spacing: -.02em; }
+  #s2 .casos .punto { width: 26px; height: 26px; }
+  #s2 .pregunta { position: absolute; left: 72px; right: 72px; top: 780px; font: 800 150px/.94 var(--f-titulo); letter-spacing: -.04em; color: var(--hoja); }
+  #s2 .resp { position: absolute; left: 72px; top: 1120px; width: 800px; font: 500 36px/1.35 var(--f-texto); color: var(--tinta-2); }
+
+  /* 3 · Reportar */
+  #s3 .pasos { position: absolute; left: 72px; top: 420px; width: 440px; display: grid; gap: 34px; }
+  #s3 .pasos li { display: grid; grid-template-columns: 56px 1fr; gap: 6px 18px; opacity: .28; }
+  #s3 .pasos .n { grid-row: span 2; width: 56px; height: 56px; border-radius: 16px; border: 2px solid var(--borde); display: grid; place-items: center; font: 700 24px/1 var(--f-dato); color: var(--hoja); }
+  #s3 .pasos h3 { font: 700 36px/1.1 var(--f-titulo); letter-spacing: -.01em; }
+  #s3 .pasos p { font: 500 24px/1.35 var(--f-texto); color: var(--tinta-2); }
+  .tel { position: absolute; left: 566px; top: 330px; width: 452px; height: 930px; border-radius: 58px; background: #050403; border: 3px solid #3a3531; box-shadow: 0 50px 120px rgb(0 0 0 / .7), 0 0 0 10px #151210; padding: 12px; }
+  .pantalla { position: relative; width: 100%; height: 100%; border-radius: 46px; overflow: hidden; background: var(--suelo); }
+  .tel .isla { position: absolute; left: 50%; top: 24px; width: 110px; height: 30px; margin-left: -55px; border-radius: 20px; background: #000; z-index: 5; }
+  .form { position: absolute; left: 0; right: 0; top: 0; padding-bottom: 28px; }
+  .form header { height: 118px; padding: 66px 22px 0; border-bottom: 1px solid var(--piedra-2); font: 600 22px/30px var(--f-texto); display: flex; gap: 14px; color: var(--tinta); }
+  .form header span { color: var(--tinta-2); }
+  .form section { padding: 20px 22px 0; }
+  .form label { display: block; font: 500 17px/24px var(--f-texto); color: #d6d3d1; margin-bottom: 8px; }
+  .form label i { font-style: normal; color: #f87171; }
+  .foto { position: relative; height: 226px; border-radius: 20px; overflow: hidden; background: rgb(28 25 23 / .5); }
+  .foto .vacia { position: absolute; inset: 0; border: 2px dashed var(--borde); border-radius: 20px; display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--tinta-3); font: 500 16px/22px var(--f-texto); }
+  .foto .vacia small { font-size: 13px; color: #57534e; }
+  .foto svg.img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+  .foto .scan { position: absolute; left: 0; right: 0; top: 0; height: 70px; background: linear-gradient(rgb(74 222 128 / 0), rgb(74 222 128 / .45)); border-bottom: 2px solid var(--hoja-2); opacity: 0; }
+  .ia { margin-top: 10px; border: 1px solid rgb(34 197 94 / .35); background: rgb(20 83 45 / .35); border-radius: 14px; padding: 10px 14px; font: 500 15px/21px var(--f-texto); color: #d6d3d1; opacity: 0; }
+  .ia b { display: flex; align-items: center; gap: 8px; font: 700 15px/21px var(--f-texto); color: var(--tinta); }
+  .ia b span { margin-left: auto; font: 700 12px/1 var(--f-texto); color: #fff; background: var(--alto); border-radius: 999px; padding: 5px 9px; }
+  .grupo { font: 500 12px/18px var(--f-texto); letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-3); margin: 0 0 6px; }
+  .tipos { border: 1px solid var(--piedra-2); border-radius: 14px; overflow: hidden; margin-bottom: 12px; --sel: 0; }
+  #root .tipos .op { position: relative; width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--piedra); border-top: 1px solid var(--piedra-2); }
+  #root .tipos .op:first-child { border-top: 0; }
+  .op::before { content: ""; position: absolute; inset: 0; background: rgb(20 83 45 / .75); opacity: 0; }
+  .op.elegida::before { opacity: var(--sel); }
+  .op > * { position: relative; }
+  .op .punto { width: 11px; height: 11px; }
+  .op .tx { flex: 1; min-width: 0; font: 600 16px/22px var(--f-texto); color: #e7e5e4; }
+  .op .tx small { display: block; font: 400 13px/18px var(--f-texto); color: var(--tinta-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #57534e; flex: none; position: relative; }
+  .op .radio::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; background: var(--hoja); box-shadow: inset 0 0 0 3px var(--suelo); opacity: 0; }
+  .op.elegida .radio::after { opacity: var(--sel); }
+  .interactivo .tipos.turno .op { animation: latido 1.4s ease-in-out infinite; }
+  .interactivo .tipos.turno { outline: 2px solid var(--hoja-2); outline-offset: 3px; }
+  @keyframes latido { 50% { filter: brightness(1.35); } }
+  .buscar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .buscar div { flex: 1; border: 1px solid var(--borde); background: var(--piedra); border-radius: 14px; padding: 9px 14px; font: 400 15px/22px var(--f-texto); color: var(--tinta-3); }
+  .buscar span { border: 1px solid var(--borde); background: var(--piedra-2); border-radius: 14px; padding: 9px 14px; font: 500 15px/22px var(--f-texto); color: #e7e5e4; }
+  .minimapa { position: relative; height: 200px; border-radius: 16px; overflow: hidden; background: #e9e5d9; }
+  .minimapa svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .minimapa svg.pin { inset: auto; left: 228px; top: 58px; width: 40px; height: 52px; margin: 0 0 0 -20px; opacity: 0; }
+  .ok { margin-top: 8px; font: 500 14px/20px var(--f-texto); color: var(--hoja-2); opacity: 0; }
+  .depto-campo { margin-top: 8px; display: flex; align-items: center; gap: 10px; font: 400 14px/20px var(--f-texto); color: var(--tinta-2); opacity: 0; }
+  .depto-campo div { flex: 1; border: 1px solid var(--borde); background: var(--piedra); border-radius: 14px; padding: 8px 14px; font: 500 15px/22px var(--f-texto); color: var(--tinta); display: flex; justify-content: space-between; }
+  .depto-campo code { font: 500 12px/22px var(--f-dato); color: var(--tinta-3); }
+  .enviar { margin-top: 18px; position: relative; border-radius: 14px; background: var(--bosque); color: #fff; font: 600 18px/26px var(--f-texto); text-align: center; padding: 13px; overflow: hidden; }
+  .tap { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgb(255 255 255 / .35); border: 2px solid rgb(255 255 255 / .8); opacity: 0; z-index: 4; pointer-events: none; }
+  .exito { position: absolute; inset: 0; background: var(--suelo); display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 40px; opacity: 0; visibility: hidden; z-index: 3; }
+  .exito .check { width: 84px; height: 84px; border-radius: 50%; background: rgb(20 83 45 / .5); display: grid; place-items: center; }
+  .exito h3 { font: 700 30px/36px var(--f-texto); }
+  .exito p { font: 400 16px/23px var(--f-texto); color: var(--tinta-2); }
+  .exito .b1 { margin-top: 10px; width: 280px; border-radius: 14px; background: var(--bosque); font: 600 17px/24px var(--f-texto); padding: 12px; }
+
+  /* 4 · Mapa */
+  #s4 .mapa-caja { position: absolute; left: 60px; top: 372px; width: 520px; height: 852px; }
+  .mapa { width: 100%; height: 100%; overflow: visible; }
+  .depto { fill: var(--c); fill-opacity: 0; stroke: #a8a29e; stroke-width: 1; stroke-dasharray: 4 3; stroke-linejoin: round; cursor: pointer; }
+  .depto.sel { stroke: #fff; stroke-width: 3; stroke-dasharray: none; }
+  .pt { stroke: #0c0a09; stroke-width: 1; pointer-events: none; }
+  .nuevo-pulso { fill: none; stroke: var(--hoja-2); stroke-width: 3; pointer-events: none; opacity: 0; }
+  .nuevo-pt { fill: var(--hoja-2); stroke: #0c0a09; stroke-width: 1.5; pointer-events: none; opacity: 0; }
+  #s4 .panel { position: absolute; left: 610px; top: 372px; width: 410px; display: grid; gap: 22px; }
+  #s4 .vivo { display: flex; align-items: center; gap: 10px; font: 500 22px/1 var(--f-texto); color: var(--tinta-2); }
+  #s4 .vivo i { width: 12px; height: 12px; border-radius: 50%; background: var(--hoja); }
+  .cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .cifras div { border: 1px solid var(--piedra-2); background: rgb(28 25 23 / .7); border-radius: 20px; padding: 16px 12px; }
+  .cifras b { display: block; font: 700 44px/1 var(--f-titulo); font-variant-numeric: tabular-nums; }
+  .cifras span { font: 400 17px/1.2 var(--f-texto); color: var(--tinta-3); display: block; margin-top: 6px; }
+  .rank h3, .detalle h3 { font: 500 16px/1 var(--f-texto); letter-spacing: .1em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 12px; }
+  #root .rank li button { width: 100%; display: grid; grid-template-columns: 22px 150px 1fr 40px; align-items: center; gap: 10px; padding: 9px 6px; border-radius: 12px; font: 500 22px/1.1 var(--f-texto); }
+  .rank li button:hover, .rank li button:focus-visible { background: var(--piedra); }
+  .rank .i { font: 500 16px/1 var(--f-dato); color: var(--tinta-3); }
+  .rank .barra { height: 9px; border-radius: 9px; background: var(--piedra-2); overflow: hidden; }
+  .rank .barra i { display: block; height: 100%; border-radius: 9px; background: #f97316; transform-origin: left center; }
+  .rank .v { text-align: right; font: 500 18px/1 var(--f-dato); color: #d6d3d1; }
+  .leyenda { position: absolute; left: 60px; top: 1236px; display: flex; align-items: center; gap: 10px; font: 400 16px/1 var(--f-texto); color: var(--tinta-2); }
+  .leyenda span { display: flex; }
+  .leyenda i { width: 22px; height: 12px; }
+  .detalle { border: 1px solid var(--borde); background: var(--piedra); border-radius: 20px; padding: 18px; min-height: 150px; }
+  .detalle strong { display: block; font: 700 34px/1.05 var(--f-titulo); }
+  .detalle p { font: 400 19px/1.35 var(--f-texto); color: var(--tinta-2); margin-top: 6px; }
+  .detalle .fila { display: flex; gap: 18px; margin-top: 12px; font: 500 18px/1 var(--f-dato); color: #d6d3d1; }
+  .tarjeta-nueva { position: absolute; left: 96px; top: 196px; width: 330px; border: 1px solid rgb(34 197 94 / .5); background: rgb(12 10 9 / .94); border-radius: 18px; padding: 14px 16px; opacity: 0; box-shadow: 0 20px 50px rgb(0 0 0 / .6); pointer-events: none; }
+  .tarjeta-nueva small { font: 700 14px/1 var(--f-dato); letter-spacing: .12em; text-transform: uppercase; color: var(--hoja-2); }
+  .tarjeta-nueva b { display: flex; align-items: center; gap: 10px; font: 600 24px/1.2 var(--f-texto); margin-top: 8px; }
+  .tarjeta-nueva span { font: 400 18px/1.3 var(--f-texto); color: var(--tinta-2); }
+
+  /* 5 · Validación */
+  .bloque { position: absolute; left: 72px; right: 72px; border: 1px solid var(--piedra-2); background: rgb(28 25 23 / .8); border-radius: 30px; padding: 34px 36px; }
+  .bloque h3 { font: 700 20px/1 var(--f-dato); letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); margin-bottom: 22px; }
+  .bloque .rep { display: flex; align-items: center; gap: 16px; font: 600 46px/1.1 var(--f-titulo); }
+  .bloque .sub { font: 400 24px/1.35 var(--f-texto); color: var(--tinta-2); margin-top: 6px; }
+  .riesgos { display: flex; align-items: center; gap: 18px; margin-top: 26px; flex-wrap: wrap; }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; padding: 14px 22px; font: 700 26px/1 var(--f-texto); color: #fff; }
+  .chip small { font: 500 17px/1 var(--f-dato); opacity: .85; letter-spacing: .04em; }
+  .chip.ia-c { background: var(--alto); }
+  .chip.ia-c::after { content: ""; position: absolute; left: 12px; right: 12px; top: 50%; height: 3px; background: #fff; transform: scaleX(var(--tachado, 0)); transform-origin: left center; }
+  .chip.tec { background: var(--critico); }
+  .flecha { font: 500 34px/1 var(--f-dato); color: var(--tinta-3); }
+  .nota { font: 400 24px/1.4 var(--f-texto); color: var(--tinta-3); margin-top: 22px; }
+  .confirmar { display: flex; align-items: center; gap: 26px; }
+  .boton-conf { position: relative; border-radius: 18px; background: var(--bosque); padding: 20px 28px; font: 600 28px/1 var(--f-texto); color: #fff; display: inline-flex; gap: 12px; align-items: center; }
+  .conteo { font: 800 92px/1 var(--f-titulo); font-variant-numeric: tabular-nums; color: var(--hoja); min-width: 70px; }
+  .conteo-tx { font: 500 26px/1.25 var(--f-texto); color: var(--tinta-2); }
+  .vecinos { display: flex; gap: 10px; margin-top: 24px; }
+  .vecinos i { width: 44px; height: 44px; border-radius: 50%; background: var(--piedra-2); border: 2px solid var(--borde); display: grid; place-items: center; }
+  .vecinos i::after { content: ""; width: 14px; height: 14px; border-radius: 50%; background: var(--hoja); }
+
+  /* 6 · Municipio */
+  .ficha { position: absolute; left: 72px; right: 72px; top: 410px; border: 1px solid var(--borde); background: var(--piedra); border-radius: 30px; padding: 12px 36px; }
+  .ficha li { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: center; padding: 30px 0; border-top: 1px solid var(--piedra-2); font: 600 30px/1.2 var(--f-texto); }
+  .ficha li:first-child { border-top: 0; }
+  .ficha li > span:first-child { font: 500 18px/1 var(--f-dato); letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); }
+  .ficha code { font: 500 24px/1.2 var(--f-dato); color: var(--tinta-2); }
+  .ficha .v { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cables { position: absolute; left: 72px; top: 822px; width: 936px; height: 100px; }
+  .cables path { fill: none; stroke: var(--hoja); stroke-width: 3; stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .destinos { position: absolute; left: 72px; right: 72px; top: 922px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .destinos li { border: 1px solid rgb(34 197 94 / .4); background: rgb(20 83 45 / .25); border-radius: 24px; padding: 26px 22px; min-height: 300px; }
+  .destinos svg { width: 44px; height: 44px; stroke: var(--hoja-2); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .destinos h3 { font: 700 30px/1.08 var(--f-titulo); margin: 16px 0 8px; }
+  .destinos p { font: 400 22px/1.35 var(--f-texto); color: var(--tinta-2); }
+  .destinos code { font: 500 18px/1 var(--f-dato); color: var(--hoja-2); }
+
+  /* 7 · Cierre */
+  #s7 .centro { position: absolute; left: 72px; right: 72px; top: 250px; display: grid; justify-items: center; text-align: center; gap: 34px; }
+  #s7 .icono { width: 190px; height: 190px; border-radius: 48px; box-shadow: 0 0 0 10px rgb(34 197 94 / .15); }
+  #s7 h2 { font: 800 112px/.96 var(--f-titulo); letter-spacing: -.035em; }
+  #s7 p { font: 500 42px/1.25 var(--f-texto); color: var(--tinta-2); max-width: 820px; text-wrap: balance; }
+  #s7 .cta { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 14px; margin-top: 14px; border-radius: 26px; background: var(--bosque); color: #fff; text-decoration: none; padding: 30px 46px; font: 700 40px/1 var(--f-texto); }
+  .brillo { position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / .35) 50%, transparent 65%); }
+  #s7 .url { font: 500 26px/1 var(--f-dato); color: var(--tinta-3); }
+  #s7 .pie { position: absolute; left: 72px; right: 72px; top: 1210px; text-align: center; font: 400 22px/1.4 var(--f-texto); color: var(--tinta-3); }
+
+  /*PLAYER-CSS*/
+  /* ───────── Página del reproductor ───────── */
+  html, body { height: 100%; }
+  [hidden] { display: none !important; }
+  .pagina { min-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; padding-block: 14px 18px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .marco { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--piedra-2); max-width: 100%; flex: none; }
+  .tapa { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(12 10 9 / .35); border: 0; cursor: pointer; z-index: 3; }
+  .tapa span { display: inline-flex; align-items: center; gap: 10px; background: var(--hoja); color: #052e16; font: 700 17px/1 var(--f-texto); padding: 15px 24px; border-radius: 999px; box-shadow: 0 10px 40px rgb(0 0 0 / .6); }
+  .lado { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+  .chips button { font: 600 13px/1 var(--f-texto); color: var(--tinta); background: var(--suelo); border: 1px solid var(--borde); border-radius: 999px; padding: 9px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .chips button i { width: 9px; height: 9px; border-radius: 50%; }
+  .chips button[aria-pressed=true] { border-color: var(--hoja); background: var(--bosque); }
+  @media (min-width: 900px) {
+    .pagina { flex-direction: row; justify-content: center; align-items: center; gap: 28px; }
+    .lado { width: 360px; flex: none; align-items: stretch; }
+  }
+  .franja { flex-wrap: wrap; width: 100%; min-height: 56px; border: 1px solid var(--piedra-2); border-radius: 14px; background: var(--piedra); padding: 10px 14px; display: flex; align-items: center; gap: 12px; font: 400 14px/1.4 var(--f-texto); color: var(--tinta-2); }
+  .franja.turno { border-color: var(--hoja); background: rgb(20 83 45 / .35); color: var(--tinta); }
+  .franja b { font: 700 11px/1 var(--f-dato); letter-spacing: .12em; text-transform: uppercase; color: var(--hoja-2); flex: none; }
+  .franja p { margin: 0; flex: 1; min-width: 140px; }
+  .btn { font: 600 14px/1 var(--f-texto); color: var(--tinta); background: var(--piedra-2); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; cursor: pointer; flex: none; }
+  .btn.verde { background: var(--bosque); border-color: var(--bosque); color: #fff; }
+  .btn:focus-visible, .caps button:focus-visible, .tapa:focus-visible, input:focus-visible, #root button:focus-visible, #root a:focus-visible, .depto:focus-visible { outline: 2px solid var(--hoja-2); outline-offset: 2px; }
+  .controles { width: 100%; display: grid; gap: 10px; }
+  .linea { display: flex; align-items: center; gap: 12px; }
+  .linea input[type=range] { flex: 1; min-width: 0; accent-color: var(--hoja); height: 24px; }
+  .tiempo { font: 500 12px/1 var(--f-dato); color: var(--tinta-2); font-variant-numeric: tabular-nums; flex: none; }
+  .caps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .caps button { font: 500 13px/1 var(--f-texto); color: var(--tinta-2); background: transparent; border: 1px solid var(--piedra-2); border-radius: 999px; padding: 8px 12px; cursor: pointer; }
+  .caps button[aria-current=true] { background: var(--tinta); color: var(--suelo); border-color: var(--tinta); font-weight: 600; }
+  .opcion { display: flex; align-items: center; gap: 8px; font: 400 13px/1.3 var(--f-texto); color: var(--tinta-2); margin-left: auto; }
+  .opcion input { accent-color: var(--hoja); width: 16px; height: 16px; }
+  /*/PLAYER-CSS*/
+</style>
+
+<!--PLAYER-->
+<div class="pagina" id="pagina">
+<div class="marco" id="marco">
+<!--/PLAYER-->
+
+<div id="root" data-composition-id="main" data-start="0" data-duration="48.5" data-width="1080" data-height="1350">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="arbol" viewBox="0 0 512 512">
+        <rect x="238" y="288" width="36" height="120" rx="10" fill="#a9754a"/>
+        <circle cx="256" cy="210" r="95" fill="#22c55e"/><circle cx="182" cy="250" r="72" fill="#22c55e"/><circle cx="330" cy="250" r="72" fill="#22c55e"/>
+        <circle cx="256" cy="150" r="66" fill="#4ade80"/><circle cx="200" cy="200" r="46" fill="#4ade80"/><circle cx="312" cy="200" r="46" fill="#4ade80"/>
+      </symbol>
+    </defs>
+  </svg>
+  <div class="fondo"></div>
+
+  <!-- 1 · Portada -->
+  <section id="s1" class="clip" data-start="0" data-duration="5.6" data-track-index="0"><div class="capa">
+    <div class="silueta"><!--SILUETA--></div>
+    <div class="marca"><svg class="icono"><use href="#arbol"/></svg><span>Mendoza Respira</span></div>
+    <h1><span class="w">El</span> <span class="w">arbolado</span> <span class="w">de</span> <span class="w">Mendoza,</span><br><em><span class="w">mapeado</span> <span class="w">por</span> <span class="w">sus</span> <span class="w">vecinos.</span></em></h1>
+    <p class="bajada">Una app para reportar en un minuto lo que ves en tu cuadra, y que llegue al municipio con evidencia.</p>
+    <p class="coord">32°53′S 68°50′O · 18 DEPARTAMENTOS · CIVIC TECH</p>
+  </div></section>
+
+  <!-- 2 · Problema -->
+  <section id="s2" class="clip" data-start="5" data-duration="6.6" data-track-index="1"><div class="capa">
+    <p class="ceja">En tu cuadra</p>
+    <ul class="casos">
+      <li><i class="punto" style="background:#dc2626"></i>Un árbol inclinado sobre la vereda.</li>
+      <li><i class="punto" style="background:#e11d48"></i>Una rama colgando sobre la calle.</li>
+      <li><i class="punto" style="background:#ef4444"></i>Un tocón donde antes había sombra.</li>
+    </ul>
+    <p class="pregunta"><span class="w">¿A</span> <span class="w">quién</span> <span class="w">le</span> <span class="w">avisás?</span></p>
+    <p class="resp">Hoy el aviso se pierde entre llamados y redes. Con una foto y un punto en el mapa queda registrado.</p>
+  </div></section>
+
+  <!-- 3 · Reportar -->
+  <section id="s3" class="clip" data-start="11" data-duration="13.1" data-track-index="2"><div class="capa">
+    <p class="ceja">Reportar</p>
+    <h2 class="titulo">Reportar lleva <em>un minuto.</em></h2>
+    <ol class="pasos">
+      <li id="p1"><span class="n">1</span><h3>Sacá una foto</h3><p>Es la evidencia principal del reporte.</p></li>
+      <li id="p2"><span class="n">2</span><h3>La IA la analiza</h3><p>Estima el riesgo y sugiere el tipo. Vos podés cambiarlo.</p></li>
+      <li id="p3"><span class="n">3</span><h3>Marcá el lugar</h3><p>Buscá la dirección o tocá el mapa.</p></li>
+      <li id="p4"><span class="n">4</span><h3>Enviá</h3><p>Sin registro y sin datos personales.</p></li>
+    </ol>
+    <div class="tel"><div class="isla"></div><div class="pantalla" id="pantalla">
+      <div class="form" id="form">
+        <header><span>‹</span>Nuevo reporte</header>
+        <section id="f-foto">
+          <label>Foto <i>*</i></label>
+          <div class="foto">
+            <div class="vacia"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg>Tocar para agregar foto<small>JPG, PNG, HEIC · Máx 10 MB</small></div>
+            <svg class="img" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice">
+              <defs><linearGradient id="cielo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fb4d6"/><stop offset="1" stop-color="#f0d9b0"/></linearGradient></defs>
+              <rect width="400" height="225" fill="url(#cielo)"/>
+              <path d="M0 96 L28 60 L70 92 L120 48 L176 96 L230 66 L290 98 L340 58 L400 92 V140 H0Z" fill="#8fa3b5" opacity=".7"/>
+              <rect x="0" y="92" width="150" height="80" fill="#c9b79c"/><rect x="18" y="112" width="30" height="34" fill="#6f6252"/><rect x="74" y="112" width="44" height="60" fill="#857560"/>
+              <rect x="286" y="80" width="114" height="92" fill="#b9a488"/><rect x="306" y="104" width="34" height="30" fill="#6f6252"/>
+              <rect x="0" y="168" width="400" height="20" fill="#bdb6aa"/><rect x="0" y="186" width="400" height="39" fill="#55504b"/>
+              <rect x="0" y="182" width="400" height="6" fill="#7b8f96"/>
+              <path d="M0 40 Q200 70 400 34" stroke="#2b2b2b" stroke-width="1.5" fill="none"/>
+              <g transform="rotate(17 196 176)"><rect x="188" y="92" width="16" height="88" rx="4" fill="#6b4a2c"/><circle cx="196" cy="70" r="46" fill="#3f7d3a"/><circle cx="162" cy="88" r="30" fill="#4a8f44"/><circle cx="230" cy="86" r="32" fill="#356b31"/><circle cx="198" cy="44" r="28" fill="#5aa152"/></g>
+              <path d="M170 176 q14 -12 30 -2 q14 -10 30 4" stroke="#6b4a2c" stroke-width="5" fill="none"/>
+            </svg>
+            <div class="scan"></div>
+            <div class="tap" id="tap1" style="left:50%;top:50%"></div>
+          </div>
+          <div class="ia"><b>✦ Análisis de la foto <span>Riesgo alto</span></b>Inclinación marcada hacia la calle y raíces levantadas.</div>
+        </section>
+        <section id="f-tipo">
+          <label>Tipo de reporte <i>*</i></label>
+          <p class="grupo">Riesgo</p>
+          <div class="tipos" id="tipos">
+            <button class="op elegida" data-tipo="Árbol peligroso" data-color="#dc2626"><i class="punto" style="background:#dc2626"></i><span class="tx">Árbol peligroso<small>Inclinado, con raíces levantadas o tronco dañado</small></span><i class="radio"></i></button>
+            <button class="op" data-tipo="Rama peligrosa" data-color="#e11d48"><i class="punto" style="background:#e11d48"></i><span class="tx">Rama peligrosa<small>Rama quebrada o colgando sobre la vereda</small></span><i class="radio"></i></button>
+            <button class="op" data-tipo="Árbol seco" data-color="#a16207"><i class="punto" style="background:#a16207"></i><span class="tx">Árbol seco<small>Sin hojas en temporada o con la corteza muerta</small></span><i class="radio"></i></button>
+          </div>
+          <p class="grupo">Falta de árboles</p>
+          <div class="tipos">
+            <button class="op" data-tipo="Faltan árboles en el frente" data-color="#0ea5e9"><i class="punto" style="background:#0ea5e9"></i><span class="tx">Faltan árboles en el frente<small>Frente de casa o comercio sin arbolado</small></span><i class="radio"></i></button>
+            <button class="op" data-tipo="Espacio para árbol" data-color="#14b8a6"><i class="punto" style="background:#14b8a6"></i><span class="tx">Espacio para árbol<small>Cazuela vacía, parada o plaza donde se puede plantar</small></span><i class="radio"></i></button>
+          </div>
+        </section>
+        <section id="f-ubi">
+          <label>¿Dónde está el árbol? <i>*</i></label>
+          <div class="buscar"><div>Calle y altura, o esquina</div><span>Buscar</span></div>
+          <div class="minimapa">
+            <svg viewBox="0 0 384 200" preserveAspectRatio="none"><g stroke="#fff" stroke-width="9" fill="none"><path d="M-10 46H400M-10 112H400M-10 172H400M60 -10V210M150 -10V210M228 -10V210M318 -10V210"/></g><g stroke="#f4d58a" stroke-width="12" fill="none"><path d="M-10 112H400"/></g><rect x="160" y="124" width="58" height="40" rx="4" fill="#bfdcae"/><path d="M-10 190 Q200 150 400 196" stroke="#a8cfe6" stroke-width="5" fill="none"/></svg>
+            <svg class="pin" viewBox="0 0 40 52"><path d="M20 51C20 51 38 32 38 19A18 18 0 1 0 2 19C2 32 20 51 20 51Z" fill="#16a34a" stroke="#fff" stroke-width="3"/><circle cx="20" cy="19" r="6.5" fill="#fff"/></svg>
+            <div class="tap" id="tap2" style="left:228px;top:112px"></div>
+          </div>
+          <p class="ok">✓ Punto marcado. Arrastrá el pin si querés ajustarlo.</p>
+          <div class="depto-campo">Departamento<div>San Martín <code>-33.0815, -68.4705</code></div></div>
+          <div class="enviar" id="enviar">Enviar reporte<div class="tap" id="tap3" style="left:50%;top:50%"></div></div>
+        </section>
+      </div>
+      <div class="exito" id="exito">
+        <div class="check"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg></div>
+        <h3>¡Reporte enviado!</h3>
+        <p>Tu reporte ya es parte del mapa ciudadano. Gracias por contribuir.</p>
+        <div class="b1">Ver en el mapa</div>
+      </div>
+    </div></div>
+  </div></section>
+
+  <!-- 4 · Mapa -->
+  <section id="s4" class="clip" data-start="23.5" data-duration="9.1" data-track-index="3"><div class="capa">
+    <p class="ceja">Explorar Mendoza</p>
+    <h2 class="titulo">Cada reporte aparece <em>en el mapa,</em> en vivo.</h2>
+    <div class="mapa-caja" id="mapa-caja"><!--MAPA-->
+      <div class="tarjeta-nueva" id="tarjeta-nueva"><small>Nuevo · recién</small><b><i class="punto" data-tipo-dot style="background:#dc2626"></i><span data-tipo-label>Árbol peligroso</span></b><span>San Martín · Riesgo alto</span></div>
+    </div>
+    <div class="leyenda">Menos <span><i style="background:#fed976;border-radius:4px 0 0 4px"></i><i style="background:#feb24c"></i><i style="background:#fd8d3c"></i><i style="background:#f03b20"></i><i style="background:#bd0026;border-radius:0 4px 4px 0"></i></span> Más reportes</div>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="vivo"><i></i>En vivo</span><span class="ejemplo">Datos de ejemplo</span></div>
+      <div class="cifras">
+        <div><b id="c-total">0</b><span>Reportes</span></div>
+        <div><b id="c-riesgo">0</b><span>Riesgo alto</span></div>
+        <div><b id="c-30">0</b><span>Últimos 30 días</span></div>
+      </div>
+      <div class="rank">
+        <h3>Reportes por departamento</h3>
+        <ol id="rank"></ol>
+      </div>
+      <div class="detalle" id="detalle"><h3>Detalle · ejemplo</h3><strong>San Martín</strong><p>Zona Este</p><div class="fila"><span>47 reportes</span><span>10 riesgo alto</span></div></div>
+    </div>
+  </div></section>
+
+  <!-- 5 · Validación -->
+  <section id="s5" class="clip" data-start="32" data-duration="6.6" data-track-index="4"><div class="capa">
+    <p class="ceja">Validación</p>
+    <h2 class="titulo">Un técnico lo evalúa. <em>Los vecinos confirman.</em></h2>
+    <div class="bloque" id="b-tec" style="top:440px">
+      <h3>Revisión técnica</h3>
+      <p class="rep"><i class="punto" data-tipo-dot style="background:#dc2626"></i><span data-tipo-label>Árbol peligroso</span></p>
+      <p class="sub">San Martín · reportado hace 2 h</p>
+      <div class="riesgos">
+        <span class="chip ia-c" id="chip-ia"><small>IA</small>Riesgo alto</span>
+        <span class="flecha" id="flecha">→</span>
+        <span class="chip tec" id="chip-tec"><small>ING. AGRÓNOMO</small>Riesgo crítico</span>
+      </div>
+      <p class="nota">El riesgo que confirma el técnico reemplaza al de la IA.</p>
+    </div>
+    <div class="bloque" id="b-vec" style="top:900px">
+      <h3>Comunidad</h3>
+      <div class="confirmar">
+        <span class="boton-conf" id="boton-conf">✓ Confirmo que existe<span class="tap" id="tap4" style="left:50%;top:50%"></span></span>
+        <b class="conteo" id="conteo">2</b>
+        <span class="conteo-tx">vecinos<br>confirmaron</span>
+      </div>
+      <div class="vecinos"><i></i><i></i><i class="v-n"></i><i class="v-n"></i><i class="v-n"></i></div>
+    </div>
+  </div></section>
+
+  <!-- 6 · Municipio -->
+  <section id="s6" class="clip" data-start="38" data-duration="6.1" data-track-index="5"><div class="capa">
+    <p class="ceja">Del vecino al municipio</p>
+    <h2 class="titulo">Llega con todo lo que hace falta <em>para priorizar.</em></h2>
+    <ul class="ficha">
+      <li><span>Tipo</span><span class="v"><i class="punto" data-tipo-dot style="background:#dc2626"></i><span data-tipo-label>Árbol peligroso</span></span></li>
+      <li><span>Ubicación</span><span class="v">San Martín <code>-33.0815, -68.4705</code></span></li>
+      <li><span>Riesgo</span><span class="v"><span class="chip tec" style="padding:10px 18px;font-size:22px">Riesgo crítico</span> confirmado por un técnico</span></li>
+      <li><span>Evidencia</span><span class="v">Foto + 5 confirmaciones de vecinos</span></li>
+    </ul>
+    <svg class="cables" viewBox="0 0 936 100"><path pathLength="1" d="M468 0V40H150V100"/><path pathLength="1" d="M468 0V100"/><path pathLength="1" d="M468 0V40H786V100"/></svg>
+    <ul class="destinos">
+      <li><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><h3>Aviso al municipio</h3><p>Cada reporte nuevo puede disparar un aviso automático.</p></li>
+      <li><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><h3>Panel municipal</h3><p>Inventario, reclamos y revisión técnica en un solo lugar.</p></li>
+      <li><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg><h3>Datos abiertos</h3><p>Descargables, sin datos personales.</p><p style="margin-top:10px"><code>CSV · GeoJSON</code></p></li>
+    </ul>
+  </div></section>
+
+  <!-- 7 · Cierre -->
+  <section id="s7" class="clip" data-start="43.5" data-duration="5" data-track-index="6"><div class="capa">
+    <div class="centro">
+      <svg class="icono"><use href="#arbol"/></svg>
+      <h2>Mendoza Respira</h2>
+      <p>Reportá en un minuto lo que ves en tu cuadra.</p>
+      <a class="cta" id="cta" href="https://mendoza-respira-app.vercel.app" target="_blank" rel="noopener">Abrir la app →<span class="brillo"></span></a>
+      <span class="url">mendoza-respira-app.vercel.app</span>
+    </div>
+    <p class="pie">Proyecto civic tech · Mendoza, Argentina · reportar no requiere datos personales</p>
+  </div></section>
+</div>
+
+<!--PLAYER-->
+<button class="tapa" id="tapa" type="button" aria-label="Reproducir el video"><span>▶ Reproducir</span></button>
+</div>
+<div class="lado" id="lado">
+<div class="franja" id="franja" aria-live="polite"><b id="franja-et">Atajos</b><p id="franja-tx">Espacio pausa · flechas saltan 5 s · tocá el video donde se ilumine.</p><div class="chips" id="chips" hidden></div><button class="btn verde" id="seguir" type="button" hidden>Seguir ▶</button></div>
+<div class="controles" id="controles">
+  <div class="linea">
+    <button class="btn" id="play" type="button" aria-label="Reproducir o pausar">▶</button>
+    <input type="range" id="barra" min="0" max="48.5" step="0.01" value="0" aria-label="Posición del video">
+    <span class="tiempo" id="tiempo">0:00 / 0:48</span>
+  </div>
+  <div class="linea" style="flex-wrap:wrap">
+    <div class="caps" id="caps"></div>
+    <label class="opcion" for="pausas"><input type="checkbox" id="pausas" checked> Frenar en las partes interactivas</label>
+  </div>
+</div>
+</div>
+</div>
+<!--/PLAYER-->
+
+<!--GSAP-->
+<script>
+(function () {
+  const RENDER = !!window.__RENDER__;
+  const root = document.getElementById("root");
+  root.classList.add(RENDER ? "render" : "interactivo");
+  const $ = (s, el) => (el || document).querySelector(s);
+  const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+
+  // ── Datos de ejemplo del mapa (los totales viven en el SVG) ──────────
+  const ZONAS = {
+    "Zona Este": ["San Martín", "Junín", "Rivadavia", "Santa Rosa", "La Paz"],
+    "Gran Mendoza": ["Capital", "Godoy Cruz", "Guaymallén", "Las Heras", "Luján de Cuyo", "Maipú", "Lavalle"],
+    "Valle de Uco": ["Tunuyán", "Tupungato", "San Carlos"],
+    "Zona Sur": ["San Rafael", "General Alvear", "Malargüe"],
+  };
+  const zonaDe = (n) => Object.keys(ZONAS).find((z) => ZONAS[z].includes(n));
+  const deptos = $$(".mapa-caja .depto").map((el) => ({ el, n: el.dataset.n, total: +el.dataset.total }));
+  const TOTAL = deptos.reduce((a, d) => a + d.total, 0);
+  const top5 = deptos.slice().sort((a, b) => b.total - a.total).slice(0, 5);
+  $("#rank").innerHTML = top5.map((d, i) =>
+    `<li><button type="button" data-n="${d.n}"><span class="i">${i + 1}</span><span>${d.n}</span><span class="barra"><i style="width:${(d.total / top5[0].total) * 100}%"></i></span><span class="v">${d.total}</span></button></li>`).join("");
+
+  // punto y pulso del reporte recién enviado (San Martín)
+  const sm = deptos.find((d) => d.n === "San Martín").el;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = $(".mapa-caja .mapa");
+  const pulso = document.createElementNS(NS, "circle"); pulso.setAttribute("class", "nuevo-pulso");
+  const nuevo = document.createElementNS(NS, "circle"); nuevo.setAttribute("class", "nuevo-pt");
+  [pulso, nuevo].forEach((c) => { c.setAttribute("cx", sm.dataset.cx); c.setAttribute("cy", sm.dataset.cy); c.setAttribute("r", c === nuevo ? 7 : 10); svg.appendChild(c); });
+
+  // ── Línea de tiempo ─────────────────────────────────────────────────
+  const tl = gsap.timeline({ paused: true });
+  const out = "power3.out";
+  const entra = (id, t) => tl.fromTo(`#${id} .capa`, { autoAlpha: 0, y: 70, filter: "blur(16px)" }, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: out }, t);
+  const sale = (id, t) => tl.to(`#${id} .capa`, { autoAlpha: 0, y: -70, filter: "blur(16px)", duration: 0.45, ease: "power2.in" }, t);
+  const blurIn = (sel, t, stagger = 0.07) => tl.fromTo(sel, { opacity: 0, y: 40, filter: "blur(18px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: out, stagger }, t);
+  const sube = (sel, t, stagger = 0.1) => tl.fromTo(sel, { opacity: 0, y: 36 }, { opacity: 1, y: 0, duration: 0.55, ease: out, stagger }, t);
+  const tap = (sel, t) => tl.fromTo(sel, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.22, ease: out, immediateRender: false }, t).to(sel, { opacity: 0, scale: 1.5, duration: 0.3 }, t + 0.25);
+  const cuenta = (el, hasta, t, dur = 1.1, desde = 0) => { const c = { n: desde }; tl.fromTo(c, { n: desde }, { n: hasta, duration: dur, ease: "power2.out", onUpdate: () => (el.textContent = Math.round(c.n)) }, t); };
+
+  // 1 · Portada (0 – 5)
+  tl.set("#s1 .capa", { autoAlpha: 1 }, 0);
+  tl.fromTo("#s1 .silueta", { opacity: 0, scale: 1.12 }, { opacity: 0.5, scale: 1, duration: 2.2, ease: out }, 0);
+  tl.fromTo("#s1 .silueta", { y: 0 }, { y: -30, duration: 5.5, ease: "none" }, 0);
+  tl.fromTo("#s1 .marca", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.6, ease: out }, 0.2);
+  blurIn("#s1 h1 .w", 0.6, 0.09);
+  sube("#s1 .bajada, #s1 .coord", 1.8, 0.2);
+  sale("s1", 5);
+
+  // 2 · Problema (5 – 11)
+  entra("s2", 5.25);
+  tl.fromTo("#s2 .casos li", { opacity: 0, x: -60 }, { opacity: 1, x: 0, duration: 0.55, ease: out, stagger: 0.75 }, 5.6);
+  tl.to("#s2 .casos li", { opacity: 0.35, duration: 0.5 }, 8.1);
+  blurIn("#s2 .pregunta .w", 8.1, 0.12);
+  sube("#s2 .resp", 9.1);
+  sale("s2", 11);
+
+  // 3 · Reportar (11 – 23.5)
+  const T3 = 11;
+  const form = $("#form"), pantalla = $("#pantalla");
+  const maxScroll = Math.max(0, form.scrollHeight - pantalla.clientHeight);
+  const yTipo = -Math.min(maxScroll, Math.max(0, $("#f-tipo").offsetTop - 130));
+  const paso = (n, t) => { tl.to("#s3 .pasos li", { opacity: 0.28, duration: 0.3 }, t); tl.to(`#p${n}`, { opacity: 1, duration: 0.3 }, t + 0.05); };
+  entra("s3", T3 + 0.25);
+  tl.fromTo("#s3 .tel", { rotationY: -28, rotationX: 8, x: 220, opacity: 0, transformPerspective: 1600 }, { rotationY: 0, rotationX: 0, x: 0, opacity: 1, duration: 1, ease: out }, T3 + 0.3);
+  sube("#s3 .pasos li", T3 + 0.5, 0.08);
+  tl.set("#s3 .pasos li", { opacity: 0.28 }, T3 + 1.3);
+  paso(1, T3 + 1.3);
+  tap("#tap1", T3 + 1.5);
+  tl.to("#s3 .foto .vacia", { opacity: 0, duration: 0.25 }, T3 + 1.9).to("#s3 .foto .img", { opacity: 1, duration: 0.35 }, T3 + 1.9);
+  paso(2, T3 + 2.7);
+  tl.fromTo("#s3 .foto .scan", { opacity: 0, y: -70 }, { opacity: 1, y: 226, duration: 0.9, ease: "none", repeat: 1, immediateRender: false }, T3 + 2.7).to("#s3 .foto .scan", { opacity: 0, duration: 0.15 }, T3 + 4.55);
+  tl.fromTo("#s3 .ia", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, ease: out }, T3 + 4.3);
+  tl.to(form, { y: yTipo, duration: 0.8, ease: "power2.inOut" }, T3 + 5.2);
+  tl.to("#tipos", { "--sel": 1, duration: 0.35 }, T3 + 6.0);
+  const P1 = T3 + 6.9;
+  paso(3, T3 + 7.3);
+  tl.to(form, { y: -maxScroll, duration: 0.8, ease: "power2.inOut" }, T3 + 7.3);
+  tap("#tap2", T3 + 8.2);
+  tl.fromTo("#s3 .pin", { opacity: 0, y: -60 }, { opacity: 1, y: 0, duration: 0.45, ease: "bounce.out" }, T3 + 8.4);
+  tl.to("#s3 .ok", { opacity: 1, duration: 0.3 }, T3 + 8.9).to("#s3 .depto-campo", { opacity: 1, duration: 0.3 }, T3 + 9.2);
+  paso(4, T3 + 10);
+  tap("#tap3", T3 + 10.2);
+  tl.to("#enviar", { scale: 0.96, duration: 0.12, yoyo: true, repeat: 1 }, T3 + 10.3);
+  tl.fromTo("#exito", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.3 }, T3 + 10.7);
+  tl.fromTo("#exito .check", { scale: 0.5 }, { scale: 1, duration: 0.5, ease: "back.out(2.5)" }, T3 + 10.7);
+  sale("s3", 23.5);
+
+  // 4 · Mapa (23.5 – 32)
+  const T4 = 23.5;
+  entra("s4", T4 + 0.25);
+  tl.fromTo("#s4 .depto", { fillOpacity: 0 }, { fillOpacity: 0.82, duration: 0.6, ease: "power1.out", stagger: { each: 0.07, from: "random" } }, T4 + 0.8);
+  tl.fromTo("#s4 .pt", { opacity: 0, scale: 0, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(3)", stagger: 0.015 }, T4 + 1.4);
+  cuenta($("#c-total"), TOTAL, T4 + 1, 1.6);
+  cuenta($("#c-riesgo"), 78, T4 + 1.1, 1.6);
+  cuenta($("#c-30"), 64, T4 + 1.2, 1.6);
+  tl.fromTo("#rank li", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.4, ease: out, stagger: 0.08 }, T4 + 1.6);
+  tl.fromTo("#rank .barra i", { scaleX: 0 }, { scaleX: 1, duration: 0.8, ease: out, stagger: 0.08 }, T4 + 1.8);
+  tl.fromTo("#detalle", { opacity: 0 }, { opacity: 1, duration: 0.4 }, T4 + 2.4);
+  // el reporte recién enviado cae en San Martín
+  tl.fromTo(nuevo, { opacity: 0, scale: 0, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(3)" }, T4 + 3.6);
+  tl.fromTo(pulso, { opacity: 0.9, scale: 1, transformOrigin: "50% 50%" }, { opacity: 0, scale: 6, duration: 1.1, ease: "power1.out", repeat: 2, immediateRender: false }, T4 + 3.6);
+  tl.fromTo("#tarjeta-nueva", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, ease: out }, T4 + 3.9);
+  cuenta($("#c-total"), TOTAL + 1, T4 + 3.9, 0.3, TOTAL);
+  cuenta($("#c-riesgo"), 79, T4 + 3.9, 0.3, 78);
+  cuenta($("#c-30"), 65, T4 + 3.9, 0.3, 64);
+  tl.to("#tarjeta-nueva", { opacity: 0, duration: 0.3 }, T4 + 6.2);
+  const P2 = T4 + 6.6;
+  sale("s4", 32);
+
+  // 5 · Validación (32 – 38)
+  const T5 = 32;
+  entra("s5", T5 + 0.25);
+  sube("#s5 .bloque", T5 + 0.6, 0.25);
+  tl.fromTo("#chip-ia", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.35, ease: out }, T5 + 1.2);
+  tl.to("#chip-ia", { "--tachado": 1, opacity: 0.55, duration: 0.4 }, T5 + 2.2);
+  tl.fromTo("#flecha, #chip-tec", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.4, ease: out, stagger: 0.12 }, T5 + 2.3);
+  tl.fromTo("#chip-tec", { scale: 1 }, { scale: 1.08, duration: 0.18, yoyo: true, repeat: 1 }, T5 + 2.9);
+  const conteo = $("#conteo");
+  tl.set("#s5 .v-n", { opacity: 0, scale: 0 }, T5);
+  [3.4, 4.1, 4.7].forEach((t, i) => {
+    if (i === 0) { tap("#tap4", T5 + t - 0.15); tl.to("#boton-conf", { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 }, T5 + t); }
+    tl.call(() => (conteo.textContent = 3 + i), null, T5 + t + 0.01);
+    tl.fromTo(conteo, { scale: 1.35 }, { scale: 1, duration: 0.35, ease: out, immediateRender: false }, T5 + t);
+    tl.to($$("#s5 .v-n")[i], { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(3)" }, T5 + t);
+  });
+  sale("s5", 38);
+
+  // 6 · Municipio (38 – 43.5)
+  const T6 = 38;
+  entra("s6", T6 + 0.25);
+  tl.fromTo("#s6 .ficha li", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.45, ease: out, stagger: 0.18 }, T6 + 0.7);
+  tl.fromTo("#s6 .cables path", { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.7, ease: "power2.inOut", stagger: 0.12 }, T6 + 1.8);
+  tl.fromTo("#s6 .destinos li", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.5, ease: out, stagger: 0.15 }, T6 + 2.3);
+  sale("s6", 43.5);
+
+  // 7 · Cierre (43.5 – 48.5)
+  const T7 = 43.5;
+  entra("s7", T7 + 0.25);
+  tl.fromTo("#s7 .icono", { scale: 0.4, rotation: -12 }, { scale: 1, rotation: 0, duration: 0.9, ease: "back.out(1.8)" }, T7 + 0.3);
+  blurIn("#s7 h2, #s7 .centro p", T7 + 0.7, 0.2);
+  sube("#s7 .cta, #s7 .url, #s7 .pie", T7 + 1.5, 0.15);
+  tl.fromTo("#s7 .brillo", { xPercent: -100 }, { xPercent: 100, duration: 0.9, ease: "power2.inOut", repeat: 1, repeatDelay: 0.5 }, T7 + 2.2);
+  tl.to({}, { duration: 0.01 }, 48.49);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines["main"] = tl;
+  tl.seek(0);
+  if (RENDER) return;
+
+  // ── Interactivo: elecciones dentro del video ────────────────────────
+  const franja = $("#franja"), franjaEt = $("#franja-et"), franjaTx = $("#franja-tx"), seguir = $("#seguir");
+  const pausas = $("#pausas"), barra = $("#barra"), play = $("#play"), tapa = $("#tapa"), tiempo = $("#tiempo");
+  let turno = null;
+  const NOTAS = [
+    [13.5, 16.4, "La foto la analiza Claude: estima la peligrosidad, sugiere el tipo de reporte y, si la reconoce, la especie. Sin IA el formulario funciona igual."],
+    [18.3, 22, "El departamento se detecta solo con OpenStreetMap y se puede corregir a mano."],
+    [23.5, 32, "Los números de este video son de ejemplo. En la app salen en vivo de los reportes. Podés tocar un departamento cuando quieras."],
+    [32, 38, "No hay registro: un identificador anónimo por dispositivo evita que alguien confirme dos veces."],
+    [38, 43.5, "El aviso al municipio se puede automatizar con n8n o Make: cada reporte nuevo dispara un webhook."],
+  ];
+  const TURNOS = {
+    tipo: "La IA sugirió «Árbol peligroso». Elegí otro tipo acá o en el teléfono del video, o seguí.",
+    mapa: "Elegí un departamento acá o tocándolo en el mapa para ver su detalle.",
+  };
+  const chips = $("#chips");
+  function armarChips(k) {
+    chips.innerHTML = k === "tipo"
+      ? $$(".tipos .op").map((o) => `<button type="button" data-tipo="${o.dataset.tipo}" aria-pressed="${o.classList.contains("elegida")}"><i style="background:${o.dataset.color}"></i>${o.dataset.tipo}</button>`).join("")
+      : top5.map((d) => `<button type="button" data-n="${d.n}" aria-pressed="${d.el.classList.contains("sel")}">${d.n}</button>`).join("");
+    chips.hidden = false;
+  }
+  chips.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.tipo) $$(".tipos .op").find((o) => o.dataset.tipo === b.dataset.tipo).click(); else elegirDepto(b.dataset.n);
+    if (turno) armarChips(turno);
+  });
+  function abrirTurno(k) {
+    if (!pausas.checked) { tl.play(); return; }
+    armarChips(k);
+    turno = k; franja.classList.add("turno"); franjaEt.textContent = "Tu turno"; franjaTx.textContent = TURNOS[k]; seguir.hidden = false;
+    if (k === "tipo") $("#tipos").classList.add("turno");
+    pintar();
+  }
+  function cerrarTurno() { chips.hidden = true; turno = null; franja.classList.remove("turno"); seguir.hidden = true; $("#tipos").classList.remove("turno"); }
+  tl.addPause(P1, () => abrirTurno("tipo"));
+  tl.addPause(P2, () => abrirTurno("mapa"));
+  seguir.addEventListener("click", () => { cerrarTurno(); tl.play(); });
+
+  // elegir el tipo de reporte: cambia lo que se ve en el resto del video
+  $$(".tipos .op").forEach((op) => op.addEventListener("click", () => {
+    $$(".tipos .op").forEach((o) => o.classList.remove("elegida"));
+    op.classList.add("elegida");
+    $$(".tipos").forEach((t) => gsap.set(t, { "--sel": 1 }));
+    $$("[data-tipo-label]").forEach((e) => (e.textContent = op.dataset.tipo));
+    $$("[data-tipo-dot]").forEach((e) => (e.style.background = op.dataset.color));
+    TURNOS.tipo = `Elegiste «${op.dataset.tipo}». Así va a figurar en el mapa.`;
+    if (turno === "tipo") { franjaTx.textContent = TURNOS.tipo; setTimeout(() => { if (turno === "tipo") { cerrarTurno(); tl.play(); } }, 900); }
+  }));
+
+  // tocar un departamento (mapa o ranking)
+  function elegirDepto(n) {
+    const d = deptos.find((x) => x.n === n); if (!d) return;
+    deptos.forEach((x) => x.el.classList.toggle("sel", x === d));
+    d.el.parentNode.appendChild(d.el);
+    const alto = Math.round(d.total * 0.21);
+    $("#detalle").innerHTML = `<h3>Detalle · ejemplo</h3><strong>${d.n}</strong><p>${zonaDe(d.n)}</p><div class="fila"><span>${d.total} reportes</span><span>${alto} riesgo alto</span></div>`;
+    if (tl.time() >= T4 && tl.time() < 32 && !tl.paused()) { tl.pause(); pintar(); }
+  }
+  deptos.forEach((d) => { d.el.setAttribute("tabindex", "0"); d.el.setAttribute("role", "button"); d.el.setAttribute("aria-label", d.n);
+    d.el.addEventListener("click", () => elegirDepto(d.n));
+    d.el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); elegirDepto(d.n); } }); });
+  $$("#rank button").forEach((b) => b.addEventListener("click", () => elegirDepto(b.dataset.n)));
+
+  // ── Reproductor ─────────────────────────────────────────────────────
+  const CAPS = [["Inicio", 0], ["El problema", 5.25], ["Reportar", 11.25], ["El mapa", 23.75], ["Validación", 32.25], ["Municipio", 38.25], ["Cierre", 43.75]];
+  const caps = $("#caps");
+  caps.innerHTML = CAPS.map(([n], i) => `<button type="button" data-i="${i}">${n}</button>`).join("");
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const DUR = 48.5;
+  let empezo = false;
+  function pintar() {
+    const t = tl.time();
+    barra.value = t;
+    tiempo.textContent = `${fmt(t)} / ${fmt(DUR)}`;
+    const fin = t >= DUR - 0.05;
+    play.textContent = fin ? "↺" : tl.paused() ? "▶" : "❚❚";
+    let cap = 0; CAPS.forEach(([, s], i) => { if (t >= s - 0.3) cap = i; });
+    $$("button", caps).forEach((b, i) => b.setAttribute("aria-current", i === cap ? "true" : "false"));
+    if (!turno) {
+      const nota = NOTAS.find(([a, b]) => t >= a && t < b);
+      franjaEt.textContent = nota ? "Dato" : "Atajos";
+      franjaTx.textContent = nota ? nota[2] : "Espacio pausa · flechas saltan 5 s · tocá el video donde se ilumine.";
+    }
+  }
+  tl.eventCallback("onUpdate", pintar);
+  tl.eventCallback("onComplete", pintar);
+  function ir(t, reproducir) { cerrarTurno(); tl.pause(); tl.time(Math.max(0, Math.min(DUR, t)), false); if (reproducir) tl.play(); pintar(); }
+  function alternar() {
+    if (!empezo) { empezo = true; tapa.hidden = true; ir(0, true); return; }
+    if (tl.time() >= DUR - 0.05) return ir(0, true);
+    if (tl.paused()) { cerrarTurno(); tl.play(); } else tl.pause();
+    pintar();
+  }
+  tapa.addEventListener("click", alternar);
+  play.addEventListener("click", alternar);
+  barra.addEventListener("input", () => { empezo = true; tapa.hidden = true; ir(+barra.value, false); });
+  caps.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; empezo = true; tapa.hidden = true; ir(CAPS[+b.dataset.i][1], true); });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, a, button")) return;
+    if (e.key === " ") { e.preventDefault(); alternar(); }
+    if (e.key === "ArrowRight") ir(tl.time() + 5, !tl.paused());
+    if (e.key === "ArrowLeft") ir(tl.time() - 5, !tl.paused());
+  });
+
+  // escalar el escenario al espacio disponible
+  const marco = $("#marco"), pagina = $("#pagina");
+  function escalar() {
+    const estilo = getComputedStyle(pagina);
+    const ancho = pagina.clientWidth - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+    const ancha = window.innerWidth >= 900;
+    const resto = ancha ? 40 : $("#franja").offsetHeight + $("#controles").offsetHeight + 70;
+    const alto = Math.max(360, window.innerHeight - resto);
+    const s = Math.min((ancha ? ancho - 388 : ancho) / 1080, alto / 1350, 1);
+    root.style.transform = `scale(${s})`;
+    marco.style.width = 1080 * s + "px"; marco.style.height = 1350 * s + "px";
+    $("#lado").style.maxWidth = ancha ? "" : Math.max(marco.offsetWidth, Math.min(ancho, 560)) + "px";
+  }
+  window.addEventListener("resize", escalar);
+  escalar(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(escalar);
+
+  // primer cuadro: la portada completa, en pausa
+  tl.time(4.2, false); pintar();
+})();
+</script>
